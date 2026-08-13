@@ -14,230 +14,297 @@ from models.lesson import Lesson, Exercise
 from models.progress import UserLessonAttempt, UserSkillProgress
 from models.user import User
 from models.course import Skill
-# Import schemas for request parsing and response formatting
-from schemas.lesson import LessonWithExercises, AnswerCheck, AnswerResult, LessonComplete
+# Import schemas for request parsing and response formatting.
+# LessonCompleteRequest replaces the old bare dict — it now accepts ONLY attempt_id.
+from schemas.lesson import (
+    LessonWithExercises,
+    AnswerCheck,
+    AnswerResult,
+    LessonComplete,
+    LessonCompleteRequest,
+)
 
 # Create the router for lesson endpoints
 router = APIRouter(prefix="/api/lessons", tags=["Lessons"])
 
-# Endpoint to fetch a lesson with its exercises
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /api/lessons/{lesson_id}
+# Returns lesson metadata + exercises with correct_answer stripped.
+# ─────────────────────────────────────────────────────────────────────────────
 @router.get("/{lesson_id}", response_model=LessonWithExercises)
 def get_lesson(lesson_id: int, db: Session = Depends(get_db)) -> Any:
     # Query lesson and eager-load exercises to avoid N+1 queries
     lesson = db.query(Lesson).options(selectinload(Lesson.exercises)).filter(Lesson.id == lesson_id).first()
-    # Check if lesson exists
+    # Raise 404 if lesson does not exist
     if not lesson:
-        # 404 if missing
         raise HTTPException(status_code=404, detail="Lesson not found")
-        
-    # Security measure: Strip the correct answers so the client can't cheat!
-    # We create a dictionary representation of the lesson to manipulate it
+
+    # Security: build a clean dict with correct_answer always set to None.
+    # Exercises are sorted by their display order so the client sees a
+    # consistent, deterministic question sequence.
     lesson_dict = {
-        "id": lesson.id, # ID
-        "skill_id": lesson.skill_id, # Parent skill
-        "order": lesson.order, # Ordering
-        "type": lesson.type, # Lesson type
-        "exercises": [] # Empty list to hold cleaned exercises
+        "id": lesson.id,
+        "skill_id": lesson.skill_id,
+        "order": lesson.order,
+        "type": lesson.type,
+        "exercises": [
+            {
+                "id": ex.id,
+                "lesson_id": ex.lesson_id,
+                "order": ex.order,
+                "type": ex.type,
+                "prompt": ex.prompt,
+                "data": ex.data,
+                "correct_answer": None,  # Always stripped — correct answers NEVER leave the server on GET
+            }
+            for ex in sorted(lesson.exercises, key=lambda e: e.order)
+        ],
     }
-    
-    # Iterate through all exercises associated with the lesson
-    for ex in lesson.exercises:
-        # Create a cleaned version of the exercise dictionary
-        ex_dict = {
-            "id": ex.id, # Exercise ID
-            "lesson_id": ex.lesson_id, # Parent lesson
-            "order": ex.order, # Ordering
-            "type": ex.type, # Exercise type
-            "prompt": ex.prompt, # User prompt
-            "data": ex.data, # Question data
-            "correct_answer": None # STRIP THE ANSWER to prevent cheating
-        }
-        # Add to our list
-        lesson_dict["exercises"].append(ex_dict)
-        
-    # Return the sanitized dictionary, which Pydantic will validate
     return lesson_dict
 
-# Endpoint to start a lesson attempt
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /api/lessons/{lesson_id}/start/{user_id}
+# Creates a fresh UserLessonAttempt row with xp_earned=0 / hearts_lost=0.
+# Returns the attempt_id so the client can include it in every /check-answer call.
+# ─────────────────────────────────────────────────────────────────────────────
 @router.post("/{lesson_id}/start/{user_id}", response_model=int)
 def start_lesson(lesson_id: int, user_id: int, db: Session = Depends(get_db)) -> int:
     # Validate that the lesson exists
     if not db.query(Lesson).filter(Lesson.id == lesson_id).first():
-        # Raise 404 if not found
         raise HTTPException(status_code=404, detail="Lesson not found")
     # Validate that the user exists
     if not db.query(User).filter(User.id == user_id).first():
-        # Raise 404 if not found
         raise HTTPException(status_code=404, detail="User not found")
-        
-    # Create a new lesson attempt record to track this session
+
+    # Create a new attempt record.
+    # xp_earned and hearts_lost start at 0 and are incremented
+    # by the server on each /check-answer call — they are NEVER written
+    # by the client directly.
     attempt = UserLessonAttempt(
-        user_id=user_id, # User making the attempt
-        lesson_id=lesson_id, # Lesson being attempted
-        started_at=datetime.now(timezone.utc), # Record the exact start time
-        xp_earned=0, # Initial XP is 0
-        hearts_lost=0, # No hearts lost yet
-        passed=False # Not passed yet
+        user_id=user_id,
+        lesson_id=lesson_id,
+        started_at=datetime.now(timezone.utc),
+        xp_earned=0,        # will be accumulated server-side during /check-answer
+        hearts_lost=0,      # will be accumulated server-side during /check-answer
+        passed=False,       # will be computed server-side at /complete
     )
-    # Add attempt to session
     db.add(attempt)
-    # Commit to DB
     db.commit()
-    # Refresh to get the generated ID
     db.refresh(attempt)
-    
-    # Return the ID of the new attempt
+
+    # Return the attempt ID — the client passes this back in every subsequent call
     return attempt.id
 
-# Endpoint to check an answer during a lesson
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /api/lessons/{lesson_id}/check-answer
+# Evaluates the user's answer server-side and — crucially — logs the outcome
+# directly to the attempt row so /complete never needs to trust client-reported
+# totals.
+#
+# Security model:
+#   • XP is incremented on the attempt row (+10 per correct answer).
+#   • Hearts are incremented on the attempt row (+1 per wrong answer).
+#   • The client receives the result for UI feedback, but the authoritative
+#     totals live in the DB.  Replaying or forging the /check-answer call
+#     with a fake attempt_id will fail the attempt lookup validation below.
+# ─────────────────────────────────────────────────────────────────────────────
 @router.post("/{lesson_id}/check-answer", response_model=AnswerResult)
 def check_answer(lesson_id: int, check: AnswerCheck, db: Session = Depends(get_db)) -> AnswerResult:
-    # Query the specific exercise to check against
-    exercise = db.query(Exercise).filter(Exercise.id == check.exercise_id, Exercise.lesson_id == lesson_id).first()
-    # If exercise doesn't exist, raise 404
+    # 1. Verify the attempt exists, belongs to the correct lesson, and is still open.
+    #    This prevents a client from injecting a fake attempt_id that belongs to
+    #    a different user or an already-completed session.
+    attempt = db.query(UserLessonAttempt).filter(
+        UserLessonAttempt.id == check.attempt_id,
+        UserLessonAttempt.lesson_id == lesson_id,
+        UserLessonAttempt.completed_at == None,  # Reject already-completed attempts
+    ).first()
+    if not attempt:
+        # Return 403 (not 404) to avoid leaking whether attempt IDs exist
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid or already-completed attempt. Call /start to begin a new session.",
+        )
+
+    # 2. Verify the exercise belongs to this lesson
+    exercise = db.query(Exercise).filter(
+        Exercise.id == check.exercise_id,
+        Exercise.lesson_id == lesson_id,
+    ).first()
     if not exercise:
-        raise HTTPException(status_code=404, detail="Exercise not found")
-        
-    # Initialize the correctness flag
+        raise HTTPException(status_code=404, detail="Exercise not found in this lesson")
+
+    # 3. Evaluate correctness
     is_correct = False
-    
-    # Handle 'match_pairs' type differently because it uses JSON arrays
+    revealed_correct_answer: Any = exercise.correct_answer  # default for scalar types
+
     if exercise.type == "match_pairs":
-        # The user answer should be a list of lists/tuples, e.g. [["word1", "trans1"], ...]
-        user_pairs = check.user_answer
-        # The correct pairs are stored in the data JSON field
-        correct_pairs = exercise.data.get("pairs", [])
-        
-        # Check if lists are valid before comparing
-        if isinstance(user_pairs, list) and isinstance(correct_pairs, list):
-            # Sort both lists of pairs to ensure order doesn't matter for correctness
+        # match_pairs — correct answer is encoded in data["pairs"], not correct_answer column.
+        # We accept either user_pairs (preferred) or user_answer as a fallback.
+        submitted_pairs = check.user_pairs if check.user_pairs is not None else check.user_answer
+        correct_pairs = exercise.data.get("pairs", []) if exercise.data else []
+
+        # Reveal the pairs list so the frontend can show the correct mapping
+        revealed_correct_answer = correct_pairs
+
+        if isinstance(submitted_pairs, list) and isinstance(correct_pairs, list):
             try:
-                sorted_user = sorted([sorted(pair) for pair in user_pairs])
-                sorted_correct = sorted([sorted(pair) for pair in correct_pairs])
-                # Compare the sorted lists
-                is_correct = (sorted_user == sorted_correct)
+                # Normalize: lowercase + strip each token, sort within each pair,
+                # then sort the full list of pairs — so order of submission doesn't matter.
+                norm_user = sorted([
+                    sorted([str(item).strip().lower() for item in pair])
+                    for pair in submitted_pairs
+                    if isinstance(pair, (list, tuple)) and len(pair) == 2
+                ])
+                norm_correct = sorted([
+                    sorted([str(item).strip().lower() for item in pair])
+                    for pair in correct_pairs
+                    if isinstance(pair, (list, tuple)) and len(pair) == 2
+                ])
+                is_correct = (len(norm_user) == len(norm_correct)) and (norm_user == norm_correct)
             except Exception:
-                # If sorting fails (e.g. malformed data), default to false
                 is_correct = False
     else:
-        # For text-based answers, compare strings case-insensitively and stripped of whitespace
-        user_ans_str = str(check.user_answer).strip().lower()
-        # The true answer from the DB
-        correct_ans_str = str(exercise.correct_answer).strip().lower() if exercise.correct_answer else ""
-        # Check if they match exactly
-        is_correct = (user_ans_str == correct_ans_str)
-        
-    # Award XP if correct, else 0
-    xp = 10 if is_correct else 0
-    
-    # Return the result with the correct answer revealed to the client for feedback
+        # All other types: case-insensitive, whitespace-stripped string comparison
+        user_ans = str(check.user_answer).strip().lower() if check.user_answer is not None else ""
+        correct_ans = str(exercise.correct_answer).strip().lower() if exercise.correct_answer else ""
+        is_correct = user_ans == correct_ans
+
+    # 4. Log outcome to the attempt row — THIS is the critical security step.
+    #    The server owns these numbers; the client never sends them at /complete.
+    XP_PER_CORRECT = 10  # configurable constant — easy to find and adjust
+    if is_correct:
+        # Accumulate XP for correct answers on the server-side attempt record
+        attempt.xp_earned += XP_PER_CORRECT
+    else:
+        # Accumulate hearts lost for wrong answers on the server-side attempt record
+        attempt.hearts_lost += 1
+
+    # Persist the updated attempt counters immediately so they survive crashes
+    db.commit()
+
+    # 5. Return feedback to the client.
+    #    xp_earned here is informational (for the "✓ +10 XP" toast), NOT authoritative.
     return AnswerResult(
-        correct=is_correct, # Boolean correctness
-        correct_answer=exercise.correct_answer, # Send back the true answer to show the user
-        xp_earned=xp # XP awarded for this question
+        correct=is_correct,
+        correct_answer=revealed_correct_answer,  # Only revealed AFTER the answer is checked
+        xp_earned=XP_PER_CORRECT if is_correct else 0,
     )
 
-# Endpoint to finalize a lesson
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /api/lessons/{lesson_id}/complete/{user_id}
+# Finalizes the lesson using ONLY server-accumulated data from the attempt row.
+#
+# Security guarantees:
+#   • Client sends only attempt_id — zero numeric values accepted from client.
+#   • xp_earned, hearts_lost, and passed are ALL derived from the DB record
+#     that was built up by /check-answer calls above.
+#   • completed_at check prevents double-submission / replay attacks.
+#   • attempt.user_id check prevents one user from completing another user's attempt.
+# ─────────────────────────────────────────────────────────────────────────────
 @router.post("/{lesson_id}/complete/{user_id}", response_model=LessonComplete)
-def complete_lesson(lesson_id: int, user_id: int, request: dict, db: Session = Depends(get_db)) -> LessonComplete:
-    # Extract completion data from request dictionary
-    xp_earned = request.get("xp_earned", 0)
-    hearts_lost = request.get("hearts_lost", 0)
-    passed = request.get("passed", False)
-    
-    # Find the user
+def complete_lesson(
+    lesson_id: int,
+    user_id: int,
+    body: LessonCompleteRequest,  # Only attempt_id — no numeric values accepted from client
+    db: Session = Depends(get_db),
+) -> LessonComplete:
+    # 1. Look up the attempt by attempt_id AND user_id.
+    #    The user_id join prevents user A from completing user B's attempt
+    #    even if they somehow obtain user B's attempt_id.
+    attempt = db.query(UserLessonAttempt).filter(
+        UserLessonAttempt.id == body.attempt_id,
+        UserLessonAttempt.user_id == user_id,       # ownership check
+        UserLessonAttempt.lesson_id == lesson_id,   # lesson consistency check
+        UserLessonAttempt.completed_at == None,     # replay attack prevention
+    ).first()
+
+    if not attempt:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid, already-completed, or unauthorized attempt.",
+        )
+
+    # 2. Look up the user and lesson (needed to update stats)
     user = db.query(User).filter(User.id == user_id).first()
-    # Find the lesson
     lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    
-    # Validate user and lesson
     if not user or not lesson:
         raise HTTPException(status_code=404, detail="User or lesson not found")
-        
-    # Find the most recent active attempt to complete
-    attempt = db.query(UserLessonAttempt).filter(
-        UserLessonAttempt.user_id == user_id,
-        UserLessonAttempt.lesson_id == lesson_id,
-        UserLessonAttempt.completed_at == None # Only find incomplete attempts
-    ).order_by(UserLessonAttempt.started_at.desc()).first()
-    
-    # If an attempt exists, update it
-    if attempt:
-        # Mark completion time
-        attempt.completed_at = datetime.now(timezone.utc)
-        # Record XP
-        attempt.xp_earned = xp_earned
-        # Record hearts lost
-        attempt.hearts_lost = hearts_lost
-        # Record success status
-        attempt.passed = passed
-        
-    # If the user passed the lesson, update their overall stats
-    if passed:
-        # Add XP to user's total
-        user.xp_total += xp_earned
-        # Deduct hearts, ensuring it doesn't drop below 0
+
+    # 3. Derive pass/fail from server-accumulated hearts_lost.
+    #    A learner fails if they lost 5 or more hearts (used all heart slots).
+    #    This mirrors Duolingo's "run out of hearts = failed attempt" rule.
+    HEARTS_TO_FAIL = 5  # configurable threshold
+    xp_earned = attempt.xp_earned        # server-accumulated, not client-supplied
+    hearts_lost = attempt.hearts_lost    # server-accumulated, not client-supplied
+    passed = hearts_lost < HEARTS_TO_FAIL  # pure server computation
+
+    # 4. Stamp completion onto the attempt row and record computed pass/fail
+    attempt.completed_at = datetime.now(timezone.utc)  # marks attempt as closed
+    attempt.passed = passed                             # server-computed
+    # xp_earned and hearts_lost are already correct on the row — no need to re-write
+
+    # 5. Deduct hearts from user's current balance (regardless of pass/fail)
+    if hearts_lost > 0:
+        # max(0,...) prevents negative heart count
         user.hearts = max(0, user.hearts - hearts_lost)
-        
-        # Check streak logic
+
+    # 6. Apply rewards only when the learner passed
+    if passed:
+        # Add server-accumulated XP to user's lifetime total
+        user.xp_total += xp_earned
+
+        # Streak logic: increment if active yesterday, reset if gap > 1 day
         today = datetime.now(timezone.utc).date()
-        # If user hasn't been active today
         if not user.last_active_date or user.last_active_date < today:
-            # Calculate days since last active
             days_diff = (today - user.last_active_date).days if user.last_active_date else 999
             if days_diff == 1:
-                # If active yesterday, increment streak
-                user.streak += 1
+                user.streak += 1      # consecutive day — keep the flame going
             elif days_diff > 1:
-                # If missed a day, reset streak to 1
-                user.streak = 1
-            # Update last active date to today
+                user.streak = 1       # gap detected — streak resets to 1 (not 0)
             user.last_active_date = today
 
-        # Update Skill Progress
-        # Get the current skill progress
+        # Update skill progress (crown level / completed_lessons counter)
         skill_prog = db.query(UserSkillProgress).filter(
             UserSkillProgress.user_id == user_id,
-            UserSkillProgress.skill_id == lesson.skill_id
+            UserSkillProgress.skill_id == lesson.skill_id,
         ).first()
-        
-        # If no progress exists, create it
+
         if not skill_prog:
-            # Get total lessons in this skill to initialize correctly
+            # First time user attempts this skill — create the progress row
             total = db.query(Lesson).filter(Lesson.skill_id == lesson.skill_id).count()
             skill_prog = UserSkillProgress(
-                user_id=user_id, # User ID
-                skill_id=lesson.skill_id, # Skill ID
-                level=0, # Start at level 0
-                completed_lessons=1, # Completed 1 lesson just now
-                total_lessons=total # Total lessons required
+                user_id=user_id,
+                skill_id=lesson.skill_id,
+                level=0,
+                completed_lessons=1,  # this lesson counts as the first
+                total_lessons=total,
             )
             db.add(skill_prog)
         else:
-            # If progress exists, increment completed lessons
+            # Increment completed lesson count for this skill
             skill_prog.completed_lessons += 1
-            
-        # Check if the user has finished all lessons in the current level for this skill
+
+        # Crown-up if all lessons in this skill are completed at the current level
         if skill_prog.completed_lessons >= skill_prog.total_lessons:
-            # Level up! (Simplified to max level 1 for this clone)
-            skill_prog.level = 1
-            # Mark completion time
+            skill_prog.level = min(skill_prog.level + 1, 5)  # cap at crown level 5
             skill_prog.completed_at = datetime.now(timezone.utc)
-            
-    # Commit all changes (attempt, user stats, skill progress) in one transaction
+
+    # 7. Commit all changes atomically (attempt close, user stats, skill progress)
     db.commit()
-    # Refresh user to get updated values
-    db.refresh(user)
-    
-    # Determine if the streak was just updated during this completion
+    db.refresh(user)  # re-read user to get the latest computed values
+
+    # Determine if the streak was updated in this session (for UI animation)
     streak_was_updated = passed and (user.last_active_date == datetime.now(timezone.utc).date())
 
-    # Return the new state to the client using the correct schema fields
+    # 8. Return the authoritative outcome — all values derived from the DB, not the request body
     return LessonComplete(
-        xp_earned=xp_earned, # XP earned during this specific lesson
-        hearts_lost=hearts_lost, # Hearts lost during this lesson
-        passed=passed, # Whether the user passed
-        new_xp_total=user.xp_total, # User's updated total XP
-        new_hearts=user.hearts, # User's updated heart count
-        streak_updated=streak_was_updated # Whether the daily streak was incremented
+        xp_earned=xp_earned,               # from attempt row (server-accumulated)
+        hearts_lost=hearts_lost,           # from attempt row (server-accumulated)
+        passed=passed,                     # server-computed (hearts_lost < 5)
+        new_xp_total=user.xp_total,        # post-update user total
+        new_hearts=user.hearts,            # post-deduction heart count
+        streak_updated=streak_was_updated, # streak animation trigger
     )
