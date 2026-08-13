@@ -1,64 +1,103 @@
-// Root layout.tsx — The top-level layout component for the entire application.
-// In Next.js App Router, this wraps EVERY page and is where we set up:
-// 1. HTML metadata (title, description) for SEO
-// 2. Global font imports
-// 3. Dark mode class on <html> for Tailwind's 'class' dark mode strategy
-// 4. Global CSS import
+// src/app/layout.tsx — Root Next.js Layout (OVERWRITTEN)
+//
+// This is the outermost shell for every page in the app.
+// It defines:
+//   1. Google Fonts import (Nunito — closest free approximation of DIN Round)
+//   2. Global metadata for SEO (title, description, open graph tags)
+//   3. DarkModeProvider — reads localStorage and sets .dark on <html>
+//   4. Global CSS via globals.css
+//
+// WHY is this a Server Component (no "use client")?
+// Next.js requires the root layout to be a Server Component so it can
+// export `metadata`. The DarkModeProvider bridges client-side logic.
+//
+// WHY suppressHydrationWarning on <html>?
+// DarkModeProvider modifies the className of <html> on the client after SSR.
+// Without suppressHydrationWarning, React would log a hydration mismatch
+// warning because the server renders "dark" but the client might change it.
 
-// Import Next.js Metadata type for type-safe SEO configuration
 import type { Metadata } from "next";
-// Import the global CSS file that contains our Duolingo design system
+// Nunito from Google Fonts — 400 (regular), 600 (semibold), 700 (bold),
+// 800 (extrabold), 900 (black) — mirrors Duolingo's typographic weight range
+import { Nunito } from "next/font/google";
+// Global CSS with Tailwind directives and Duolingo CSS design tokens
 import "./globals.css";
+// DarkModeProvider bootstraps dark/light theme from localStorage on mount
+import { DarkModeProvider } from "@/components/DarkModeProvider";
 
-// ===================================================================
+// Initialize Nunito font with the weights Duolingo uses
+// subsets: ["latin"] keeps the font bundle small for Latin-script languages
+const nunito = Nunito({
+  subsets: ["latin"],
+  weight: ["400", "600", "700", "800", "900"],
+  // CSS variable name so we can also reference the font via var(--font-nunito)
+  variable: "--font-nunito",
+  // display: 'swap' prevents invisible text while the font loads
+  display: "swap",
+});
+
+// =====================================================================
 // SEO METADATA
-// This metadata object configures the <head> tags for every page.
-// Individual pages can override these values with their own metadata exports.
-// ===================================================================
+// Individual pages can override any of these values with their own
+// `export const metadata` export.
+// =====================================================================
 export const metadata: Metadata = {
-  // Page title — shown in browser tab and search results
-  title: "Lingo — Learn a Language for Free",
-  // Meta description — shown in search engine result snippets
-  description:
-    "Learn Spanish and more with Lingo! The free, fun, and effective way to learn a language. Practice with interactive lessons, earn XP, and maintain your streak.",
-  // Keywords for search engine optimization
-  keywords: [
-    "language learning",
-    "Spanish",
-    "Duolingo clone",
-    "education",
-    "gamified learning",
-  ],
+  // Browser tab title and the default for search-engine result titles
+  title: "Duolingo Clone",
+  // Meta description shown beneath the title in Google search results
+  description: "Learn languages for free",
+  // Keywords help less-sophisticated crawlers categorize the page
+  keywords: ["language learning", "Duolingo", "Spanish", "education", "free"],
+  // Canonical author attribution
+  authors: [{ name: "Duolingo Clone" }],
+  // Open Graph tags — used by Facebook, Twitter cards, Slack previews, etc.
+  openGraph: {
+    // OG title (can differ from <title> — keep it punchy)
+    title: "Duolingo Clone — Learn Languages for Free",
+    // OG description shown in social media link previews
+    description: "The free, fun, and effective way to learn a language.",
+    // Content type: "website" is correct for a web app
+    type: "website",
+    // Locale for language/region targeting
+    locale: "en_US",
+  },
+  // Twitter-specific card metadata
+  twitter: {
+    // "summary_large_image" shows a large image preview on Twitter
+    card: "summary_large_image",
+    title: "Duolingo Clone",
+    description: "Learn languages for free",
+  },
+  // Robots directives for search engine crawlers
+  robots: {
+    index: true,    // Allow the page to be indexed
+    follow: true,   // Allow following links on the page
+  },
 };
 
-// ===================================================================
-// ROOT LAYOUT COMPONENT
-// This is the outermost wrapper for all pages in the application.
-// It renders the <html> and <body> tags, which means it controls
-// global attributes like language, dark mode class, and font.
-// ===================================================================
+// RootLayout — wraps every page route in the application
 export default function RootLayout({
   children,
 }: Readonly<{
-  // children is the page content that Next.js injects into this layout
+  // children is the page or nested layout that Next.js injects here
   children: React.ReactNode;
 }>) {
   return (
-    // Set lang="en" for accessibility (screen readers use this to determine pronunciation)
-    // We add the "dark" class by default to match Duolingo's dark charcoal theme.
-    <html lang="en" className="dark" suppressHydrationWarning>
-      {/* 
-        suppressHydrationWarning is needed because we may modify the <html> 
-        element's class on the client side (for dark mode), which would cause 
-        a mismatch between server-rendered and client-rendered HTML.
-      */}
+    // lang="en" helps screen readers pick the correct pronunciation engine
+    // suppressHydrationWarning: DarkModeProvider may change className client-side
+    <html lang="en" suppressHydrationWarning>
       <body
-        // Apply the Nunito font family as the base font for the entire app
-        // antialiased enables font smoothing for crisper text rendering
-        className="font-din antialiased"
+        // Apply Nunito via the CSS variable AND as a direct class
+        // antialiased: enables sub-pixel font smoothing for crisper text
+        className={`${nunito.variable} font-[family-name:var(--font-nunito)] antialiased`}
       >
-        {/* Render the page content passed by Next.js routing */}
-        {children}
+        {/*
+          DarkModeProvider runs useEffect on mount to read localStorage('duo-theme')
+          and add/remove the 'dark' class on <html>. All pages get themed correctly.
+        */}
+        <DarkModeProvider>
+          {children}
+        </DarkModeProvider>
       </body>
     </html>
   );

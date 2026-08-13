@@ -61,8 +61,8 @@ def refill_hearts(user_id: int, db: Session = Depends(get_db)) -> UserResponse:
         # HTTP 404 since the user ID is invalid
         raise HTTPException(status_code=404, detail="User not found")
         
-    # Define the cost to refill hearts to prevent hardcoding magic numbers
-    refill_cost: int = 350
+    # Define the cost to refill hearts (100 gems)
+    refill_cost: int = 100
     
     # Check if the user has enough gems to pay for the refill
     if user.gems < refill_cost:

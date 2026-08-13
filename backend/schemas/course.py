@@ -74,6 +74,8 @@ class SkillWithProgress(SkillResponse):
     is_locked: bool = True
     # The ID of the next uncompleted lesson in this skill (or first lesson if completed) for starting lessons
     next_lesson_id: Optional[int] = None
+    # Ordered list of all lesson IDs for this skill — one path node is rendered per lesson
+    lesson_ids: List[int] = []
 
 # Define schema for Unit containing nested skills with progress
 class UnitWithSkills(UnitResponse):

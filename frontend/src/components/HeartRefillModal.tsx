@@ -1,12 +1,14 @@
 // src/components/HeartRefillModal.tsx — Refill Hearts Modal Component
 //
+// Uses shared HeartIcon and GemIcon components for 100% visual consistency.
 // Allows users to spend 350 gems to instantly refill their hearts back to max (5).
-// Handles API call to POST /api/users/{user_id}/refill-hearts and displays error if insufficient gems.
 
 "use client";
 
 import React, { useState } from "react";
 import { userApi } from "@/lib/api";
+import { GemIcon } from "./GemIcon";
+import { HeartIcon } from "./HeartIcon";
 
 interface HeartRefillModalProps {
   user?: {
@@ -30,7 +32,7 @@ export const HeartRefillModal: React.FC<HeartRefillModalProps> = ({
   const currentHearts = user?.hearts ?? 4;
   const maxHearts = user?.max_hearts ?? 5;
   const gems = user?.gems ?? 500;
-  const REFILL_COST = 350;
+  const REFILL_COST = 100;
 
   const handleRefill = async () => {
     if (!user) return;
@@ -64,7 +66,9 @@ export const HeartRefillModal: React.FC<HeartRefillModalProps> = ({
         </button>
 
         {/* Heart Icon Illustration */}
-        <div className="text-6xl mb-3 animate-pulse">❤️</div>
+        <div className="flex justify-center mb-3 animate-pulse">
+          <HeartIcon size={56} />
+        </div>
 
         {/* Modal Title */}
         <h3 className="text-2xl font-black text-[var(--text-primary)] mb-2">
@@ -72,7 +76,7 @@ export const HeartRefillModal: React.FC<HeartRefillModalProps> = ({
         </h3>
 
         {/* Description */}
-        <p className="text-sm text-[var(--text-secondary)] mb-6">
+        <p className="text-sm font-bold text-[var(--text-secondary)] mb-6">
           Refill your hearts to full so you can keep learning without interruptions!
         </p>
 
@@ -82,8 +86,8 @@ export const HeartRefillModal: React.FC<HeartRefillModalProps> = ({
             <span className="text-xs text-[var(--text-tertiary)] uppercase font-bold block">
               Current Hearts
             </span>
-            <span className="font-black text-lg text-cardinal">
-              {currentHearts} / {maxHearts}
+            <span className="font-black text-lg text-cardinal flex items-center justify-center gap-1">
+              <HeartIcon size={18} /> {currentHearts} / {maxHearts}
             </span>
           </div>
           <div className="h-8 w-px bg-[var(--border)]" />
@@ -91,7 +95,9 @@ export const HeartRefillModal: React.FC<HeartRefillModalProps> = ({
             <span className="text-xs text-[var(--text-tertiary)] uppercase font-bold block">
               Your Gems
             </span>
-            <span className="font-black text-lg text-macaw">💎 {gems}</span>
+            <span className="font-black text-lg text-macaw flex items-center justify-center gap-1">
+              <GemIcon size={18} /> {gems}
+            </span>
           </div>
         </div>
 
@@ -115,8 +121,8 @@ export const HeartRefillModal: React.FC<HeartRefillModalProps> = ({
           ) : (
             <>
               <span>REFILL HEARTS</span>
-              <span className="bg-black/20 px-2 py-0.5 rounded-duo-pill text-xs font-black">
-                💎 {REFILL_COST}
+              <span className="bg-black/20 px-2 py-0.5 rounded-duo-pill text-xs font-black flex items-center gap-1">
+                <GemIcon size={14} /> {REFILL_COST}
               </span>
             </>
           )}

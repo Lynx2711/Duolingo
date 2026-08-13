@@ -1,11 +1,10 @@
-// src/app/path/page.tsx — Duolingo Home Learning Path Page
+// src/app/path/page.tsx — Duolingo Learning Path Page (Clean & Pixel-Perfect)
 //
-// Core page: Duolingo's signature winding S-curve skill path.
-// Fetches course path + user data, renders:
-// - Sticky TopBar (gamification stats)
-// - Fixed left Sidebar (navigation)
-// - Scrollable center column with unit banners + skill nodes
-// - Fixed right sidebar (Super promo, Leaderboard, Quests)
+// Features:
+// - Always dashed SVG curve path connectors (green for completed, dark gray for locked)
+// - Clean unit header banners
+// - Dynamic DB learning path binding
+// - Responsive layout with left sidebar and right widget panel
 
 "use client";
 
@@ -14,8 +13,22 @@ import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { RightSidebar } from "@/components/RightSidebar";
 import { UnitHeader } from "@/components/UnitHeader";
-import { PathNode, SkillPathNodeData } from "@/components/PathNode";
+import { PathNode, NODE_DIAMETER } from "@/components/PathNode";
 import { courseApi, userApi } from "@/lib/api";
+
+interface SkillData {
+  id: number;
+  unit_id: number;
+  name: string;
+  color: string;
+  order: number;
+  level: number;
+  completed_lessons: number;
+  total_lessons: number;
+  is_locked: boolean;
+  next_lesson_id?: number | null;
+  lesson_ids?: number[];
+}
 
 interface UnitData {
   id: number;
@@ -24,7 +37,7 @@ interface UnitData {
   title: string;
   description?: string | null;
   color: string;
-  skills: SkillPathNodeData[];
+  skills: SkillData[];
 }
 
 interface CoursePathData {
@@ -45,25 +58,76 @@ interface UserData {
   daily_goal_xp: number;
 }
 
+interface NodeItem {
+  lessonId: number;
+  skillName: string;
+  color: string;
+  isCompleted: boolean;
+  isLocked: boolean;
+  isNextAvailable: boolean;
+}
+
+function flattenNodes(unit: UnitData): NodeItem[] {
+  const items: NodeItem[] = [];
+  let foundNext = false;
+
+  for (const skill of unit.skills) {
+    const ids =
+      skill.lesson_ids && skill.lesson_ids.length > 0
+        ? skill.lesson_ids
+        : skill.next_lesson_id
+        ? [skill.next_lesson_id]
+        : [skill.id];
+
+    ids.forEach((lid, i) => {
+      const isCompleted = skill.level >= 1 || skill.completed_lessons > i;
+      const isLocked = skill.is_locked;
+      const isNextAvailable = !isLocked && !isCompleted && !foundNext;
+      if (isNextAvailable) foundNext = true;
+
+      items.push({
+        lessonId: lid,
+        skillName: skill.name,
+        color: skill.color || unit.color,
+        isCompleted,
+        isLocked,
+        isNextAvailable,
+      });
+    });
+  }
+  return items;
+}
+
+// Layout constants
+const NODE_R   = NODE_DIAMETER / 2; // 36px
+const ROW_H    = 100;               // 72px node + 28px vertical gap = 100px
+const CANVAS_W = 480;
+const PAD_TOP  = 60;
+const OFFSETS  = [0, 55, 80, 55, 0, -55, -80, -55];
+
+function colX(idx: number) {
+  return CANVAS_W / 2 + OFFSETS[idx % OFFSETS.length];
+}
+
 export default function PathPage() {
   const [coursePath, setCoursePath] = useState<CoursePathData | null>(null);
-  const [user, setUser] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedSkillId, setSelectedSkillId] = useState<number | null>(null);
+  const [user, setUser]             = useState<UserData | null>(null);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const [pathData, userData] = await Promise.all([
+      const [path, u] = await Promise.all([
         courseApi.getLearningPath(1, 1),
         userApi.getUser(1),
       ]);
-      setCoursePath(pathData as CoursePathData);
-      setUser(userData as UserData);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load learning path");
+      setCoursePath(path as CoursePathData);
+      setUser(u as UserData);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
       setLoading(false);
     }
@@ -73,146 +137,139 @@ export default function PathPage() {
     fetchData();
   }, []);
 
-  // Find the first uncompleted & unlocked skill
-  let nextAvailableSkillId: number | null = null;
-  if (coursePath) {
-    outer: for (const unit of coursePath.units) {
-      for (const skill of unit.skills) {
-        if (!skill.is_locked && skill.level < 1) {
-          nextAvailableSkillId = skill.id;
-          break outer;
-        }
-      }
-    }
-  }
-
-  // Close popover when clicking outside nodes
-  const handleBackgroundClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      setSelectedSkillId(null);
-    }
-  };
-
   return (
     <div
       className="min-h-screen flex flex-col"
       style={{ background: "var(--background)", color: "var(--text-primary)" }}
     >
-      {/* Sticky top bar */}
+      {/* Top bar */}
       <TopBar user={user} onUserUpdate={fetchData} />
 
-      {/* Page body */}
-      <div className="flex flex-1 relative">
-
-        {/* Left sidebar (fixed, 220px) */}
+      {/* Main body: left sidebar | centre path | right panel */}
+      <div className="flex flex-1">
         <Sidebar activeKey="learn" />
 
-        {/* Center scrollable path column */}
+        {/* Centre column — scrollable path */}
         <main
-          className="flex-1 flex flex-col items-center overflow-y-auto"
-          style={{
-            // Account for fixed sidebar widths
-            marginLeft: "220px",
-            marginRight: "0",
-            paddingTop: "24px",
-            paddingBottom: "80px",
+          className="flex-1 md:ml-20 xl:ml-[240px] flex justify-center overflow-y-auto px-4 py-8"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedId(null);
           }}
-          onClick={handleBackgroundClick}
         >
-          {/* Inner container — narrow like Duolingo (~380px) */}
-          <div className="w-full max-w-[380px] flex flex-col items-center px-2">
-
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-24 gap-4">
-                <div className="text-5xl animate-bounce">🦉</div>
-                <p className="font-extrabold text-sm text-[var(--text-secondary)]">
-                  Loading your learning path...
+          <div className="w-full max-w-[500px] flex flex-col items-stretch">
+            {loading && (
+              <div className="flex flex-col items-center justify-center py-32 gap-4">
+                <img
+                  src="https://d35aaqx5ub95lt.cloudfront.net/vendor/70a4be81077a8037698067f583816ff9.svg"
+                  alt="Duo"
+                  className="w-16 h-16 animate-bounce"
+                />
+                <p className="text-sm font-bold text-[var(--text-secondary)]">
+                  Loading your path…
                 </p>
               </div>
+            )}
 
-            ) : error ? (
-              <div
-                className="p-8 text-center max-w-sm my-12 rounded-2xl"
-                style={{ background: "var(--background-secondary)", border: "2px solid var(--border)" }}
-              >
-                <div className="text-4xl mb-2">⚠️</div>
-                <h3 className="font-black text-base text-[#FF4B4B] mb-2">Unable to load learning path</h3>
-                <p className="text-xs text-[var(--text-secondary)] mb-4">{error}</p>
+            {!loading && error && (
+              <div className="p-8 text-center rounded-2xl border-2 border-[#37464F] bg-[#1A2C32] my-12">
+                <p className="text-[#FF4B4B] font-black mb-2">Unable to load path</p>
+                <p className="text-xs text-[#8A9BA3] mb-4">{error}</p>
                 <button
                   onClick={fetchData}
-                  className="btn-duo-primary py-2.5 px-6 text-xs"
+                  className="px-5 py-2 rounded-xl bg-[#58CC02] text-white font-black text-sm"
                 >
-                  RETRY
+                  Retry
                 </button>
               </div>
-
-            ) : coursePath && coursePath.units.length > 0 ? (
-              // Render each unit
-              (() => {
-                // Build a flat global index for consistent S-curve across all units
-                let globalIdx = 0;
-                return coursePath.units.map((unit) => {
-                  const unitStart = globalIdx;
-                  globalIdx += unit.skills.length;
-
-                  return (
-                    <section key={unit.id} className="w-full flex flex-col items-center mb-8">
-                      {/* Unit banner */}
-                      <UnitHeader
-                        unitNumber={unit.order}
-                        title={unit.title}
-                        description={unit.description}
-                        color={unit.color}
-                      />
-
-                      {/* Skill nodes */}
-                      <div className="w-full flex flex-col items-center">
-                        {unit.skills.map((skill, skillIdx) => {
-                          const flatIndex = unitStart + skillIdx;
-                          const isNext = skill.id === nextAvailableSkillId;
-                          const isSelected = skill.id === selectedSkillId;
-                          const isLast = skillIdx === unit.skills.length - 1;
-
-                          return (
-                            <PathNode
-                              key={skill.id}
-                              skill={skill}
-                              index={flatIndex}
-                              isNextAvailable={isNext}
-                              isSelected={isSelected}
-                              isLast={isLast}
-                              onSelect={() =>
-                                setSelectedSkillId((prev) =>
-                                  prev === skill.id ? null : skill.id
-                                )
-                              }
-                            />
-                          );
-                        })}
-                      </div>
-                    </section>
-                  );
-                });
-              })()
-
-            ) : (
-              <div className="text-center py-12 text-[var(--text-secondary)] font-bold">
-                No units available.
-              </div>
             )}
+
+            {!loading && !error && coursePath && coursePath.units.map((unit) => {
+              const nodes   = flattenNodes(unit);
+              const n       = nodes.length;
+              const canvasH = PAD_TOP + n * ROW_H + 40;
+
+              const positions = nodes.map((_, i) => ({
+                cx: colX(i),
+                cy: PAD_TOP + i * ROW_H + NODE_R,
+              }));
+
+              return (
+                <section key={unit.id} className="flex flex-col items-center mb-10 w-full">
+                  {/* Unit header banner */}
+                  <div className="w-full">
+                    <UnitHeader
+                      unitNumber={unit.order}
+                      title={unit.title}
+                      description={unit.description}
+                      color={unit.color}
+                    />
+                  </div>
+
+                  {/* Node canvas */}
+                  <div
+                    className="relative w-full"
+                    style={{ height: canvasH, maxWidth: CANVAS_W }}
+                  >
+                    {/* Always Dashed SVG connector curves */}
+                    <svg
+                      className="absolute inset-0 pointer-events-none z-0"
+                      width={CANVAS_W}
+                      height={canvasH}
+                      style={{ overflow: "visible" }}
+                    >
+                      {positions.slice(0, -1).map(({ cx: ax, cy: ay }, i) => {
+                        const { cx: bx, cy: by } = positions[i + 1];
+                        const midY = (ay + by) / 2;
+                        const completed = nodes[i].isCompleted;
+                        // Always dashed lines: green when completed, dark gray when locked
+                        const strokeColor = completed ? "#58CC02" : "#37464F";
+
+                        return (
+                          <path
+                            key={i}
+                            d={`M ${ax} ${ay + NODE_R + 4} C ${ax} ${midY}, ${bx} ${midY}, ${bx} ${by - NODE_R - 4}`}
+                            stroke={strokeColor}
+                            strokeWidth={6}
+                            strokeDasharray="8 6"
+                            strokeLinecap="round"
+                            fill="none"
+                          />
+                        );
+                      })}
+                    </svg>
+
+                    {/* Lesson nodes */}
+                    {nodes.map((node, i) => {
+                      const { cx, cy } = positions[i];
+                      return (
+                        <PathNode
+                          key={node.lessonId}
+                          lessonId={node.lessonId}
+                          skillName={node.skillName}
+                          color={node.color}
+                          isCompleted={node.isCompleted}
+                          isLocked={node.isLocked}
+                          isNextAvailable={node.isNextAvailable}
+                          isSelected={selectedId === node.lessonId}
+                          cx={cx}
+                          cy={cy}
+                          onSelect={() =>
+                            setSelectedId((prev) =>
+                              prev === node.lessonId ? null : node.lessonId
+                            )
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         </main>
 
-        {/* Right sidebar */}
-        <div
-          className="hidden lg:block flex-shrink-0 overflow-y-auto"
-          style={{
-            width: "340px",
-            paddingTop: "24px",
-            paddingRight: "24px",
-            paddingBottom: "24px",
-          }}
-        >
+        {/* Right widget panel */}
+        <div className="hidden lg:flex flex-col w-[340px] shrink-0 px-6 py-8 overflow-y-auto">
           <RightSidebar user={user} />
         </div>
       </div>

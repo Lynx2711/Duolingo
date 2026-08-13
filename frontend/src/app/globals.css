@@ -163,9 +163,9 @@
 
   /* Secondary button style — gray/outlined for less prominent actions */
   .btn-duo-secondary {
-    @apply bg-white text-eel font-bold py-3 px-8 rounded-duo-md
-           border-2 border-swan shadow-duo-gray uppercase tracking-wider text-sm
-           hover:bg-polar
+    @apply bg-[var(--background-secondary)] text-[var(--text-primary)] font-bold py-3 px-8 rounded-duo-md
+           border-2 border-[var(--border)] shadow-duo-gray uppercase tracking-wider text-sm
+           hover:bg-[var(--background-hover)]
            active:translate-y-[4px] active:shadow-none;
   }
 
@@ -194,16 +194,11 @@
   /* These are the tappable word tiles in Duolingo's word bank exercises */
   .word-chip {
     @apply inline-flex items-center px-3 py-2 rounded-duo-md
-           bg-white border-2 border-swan shadow-duo-gray
-           text-eel font-bold text-sm cursor-pointer select-none
-           hover:bg-polar
+           bg-[var(--background-secondary)] border-2 border-[var(--border)]
+           text-[var(--text-primary)] font-bold text-sm cursor-pointer select-none
+           hover:bg-[var(--background-hover)]
            active:translate-y-[2px] active:shadow-none
            transition-all duration-150;
-  }
-
-  /* Dark mode variant for word chips */
-  .dark .word-chip {
-    @apply bg-dark-elevated border-dark-border text-dark-text;
   }
 
   /* --- Progress bar (lesson progress at the top) --- */

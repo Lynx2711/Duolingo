@@ -1,16 +1,9 @@
-// src/components/PathNode.tsx — Winding S-Curve Skill Node Component
+// src/components/PathNode.tsx — Duolingo Path Level Node
 //
-// Renders an individual skill node along Duolingo's winding learning path.
-//
-// Key Mechanics:
-// 1. S-Curve Offset: translateX offsets create the zigzag serpentine trail.
-// 2. Graded Node States:
-//    - Locked: Muted dark circle, lock icon, shake animation on click.
-//    - Available (Next to do): Vibrant color, pulsing ring, Duo mascot to the right.
-//    - Completed: Green circle with white checkmark, progress ring.
-// 3. Tap-to-Preview Popover: Clicking opens a card below the node (in-flow,
-//    not floating over the next node) with a START/PRACTICE button.
-// 4. Connector line: A thin vertical segment renders between nodes.
+// Features 3 distinct states matching real Duolingo:
+// 1. Completed: Feather Green (#58CC02), gray shadow (#2B363C), official Star SVG icon
+// 2. Available: Unit Color (#58CC02 / #CE82FF / #1CB0F6), gray shadow (#2B363C), pulsing glow ring, START badge & Duo Mascot beside it
+// 3. Locked: Dark Gray (#37464F), gray shadow (#2B363C), Padlock SVG icon
 
 "use client";
 
@@ -18,267 +11,152 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { DuoMascot } from "./DuoMascot";
 
-export interface SkillPathNodeData {
-  id: number;
-  unit_id: number;
-  name: string;
-  icon_url?: string | null;
+export interface PathNodeProps {
+  lessonId: number;
+  skillName: string;
   color: string;
-  order: number;
-  level: number;
-  completed_lessons: number;
-  total_lessons: number;
-  is_locked: boolean;
-  next_lesson_id?: number | null;
-}
-
-interface PathNodeProps {
-  skill: SkillPathNodeData;
-  // Flat index across all units (for S-curve calculation)
-  index: number;
+  isCompleted: boolean;
+  isLocked: boolean;
   isNextAvailable: boolean;
   isSelected: boolean;
+  cx: number;
+  cy: number;
   onSelect: () => void;
-  // Whether this node is last in its unit (suppress bottom connector)
-  isLast?: boolean;
 }
 
-// Duolingo's S-curve offsets — nodes zigzag left-center-right
-const OFFSETS = [0, 40, 65, 40, 0, -40, -65, -40];
+export const NODE_DIAMETER = 72; // px
+const R = NODE_DIAMETER / 2;     // 36px
 
 export const PathNode: React.FC<PathNodeProps> = ({
-  skill,
-  index,
+  lessonId,
+  skillName,
+  color,
+  isCompleted,
+  isLocked,
   isNextAvailable,
   isSelected,
+  cx,
+  cy,
   onSelect,
-  isLast = false,
 }) => {
-  const [isShaking, setIsShaking] = useState(false);
-
-  const offsetX = OFFSETS[index % OFFSETS.length];
-
-  // SVG Progress Ring
-  const radius = 36;
-  const strokeWidth = 5;
-  const circumference = 2 * Math.PI * radius;
-  const progressRatio =
-    skill.total_lessons > 0
-      ? Math.min(1, skill.completed_lessons / skill.total_lessons)
-      : 0;
-  const strokeDashoffset = circumference - progressRatio * circumference;
+  const [shaking, setShaking] = useState(false);
 
   const handleClick = () => {
-    if (skill.is_locked) {
-      setIsShaking(true);
-      setTimeout(() => setIsShaking(false), 500);
-      return;
+    if (isLocked) {
+      setShaking(true);
+      setTimeout(() => setShaking(false), 500);
+    } else {
+      onSelect();
     }
-    onSelect();
   };
 
-  const lessonToLaunch = skill.next_lesson_id || 1;
+  // Node Face Color
+  const faceColor = isLocked
+    ? "#37464F"
+    : isCompleted
+    ? "#58CC02"
+    : color || "#58CC02";
 
-  // Node color: locked = dark muted, else use skill color
-  const nodeColor = skill.is_locked ? "#3C4B52" : (skill.color || "#58CC02");
-  const nodeShadow = skill.is_locked
-    ? "0 4px 0 #2A363C"
-    : `0 5px 0 ${skill.color ? skill.color + "99" : "#46A302"}`;
-
-  // Completed = has level ≥ 1
-  const isCompleted = skill.level >= 1;
+  // Gray shadow for all nodes as requested
+  const shadowColor = "#2B363C";
 
   return (
-    // Outer wrapper: reserves vertical space for the popover when open
-    // min-h allows the popover to expand the row without pushing into the next node
     <div
-      className="relative flex flex-col items-center select-none"
-      style={{
-        transform: `translateX(${offsetX}px)`,
-        // Reserve enough vertical space: base node height + popover height when selected
-        marginBottom: isSelected ? "12px" : "40px",
-        marginTop: "8px",
-      }}
+      className="absolute"
+      style={{ left: cx - R, top: cy - R, width: NODE_DIAMETER, height: NODE_DIAMETER }}
     >
-      {/* ── Duo Mascot: floats to the RIGHT of the active node ── */}
+      {/* ── Active pulse glow ring for current available node ── */}
       {isNextAvailable && (
         <div
-          className="absolute z-20"
-          style={{
-            // Position mascot to the right and vertically centered with the node button
-            right: "-90px",
-            top: "50%",
-            transform: "translateY(-60%)",
-          }}
+          className="absolute rounded-full border-4 border-[#58CC02] animate-ping opacity-30 pointer-events-none"
+          style={{ inset: -10 }}
+        />
+      )}
+
+      {/* ── Duo mascot beside active available node ── */}
+      {isNextAvailable && (
+        <div
+          className="absolute pointer-events-none z-20"
+          style={{ left: NODE_DIAMETER + 10, top: "50%", transform: "translateY(-50%)" }}
         >
-          <DuoMascot width={72} height={72} />
+          <DuoMascot width={68} height={68} />
         </div>
       )}
 
-      {/* ── "START" speech-bubble badge above active node ── */}
+      {/* ── START speech-bubble badge above active available node ── */}
       {isNextAvailable && !isSelected && (
         <div
-          className="absolute z-20 bg-white text-[#1A2C32] text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg border-2 border-[#E5E5E5]"
-          style={{ top: "-34px" }}
+          className="absolute z-20 pointer-events-none animate-bounce"
+          style={{ bottom: NODE_DIAMETER + 6, left: "50%", transform: "translateX(-50%)" }}
         >
-          START
-          {/* Triangle pointer */}
-          <div
-            className="absolute left-1/2 -translate-x-1/2 w-0 h-0"
-            style={{
-              bottom: "-7px",
-              borderLeft: "6px solid transparent",
-              borderRight: "6px solid transparent",
-              borderTop: "7px solid white",
-            }}
-          />
+          <div className="bg-[#58CC02] text-white text-[11px] font-black uppercase tracking-widest px-4 py-1 rounded-2xl border-b-4 border-[#46A302] whitespace-nowrap shadow-lg">
+            START
+          </div>
         </div>
       )}
 
-      {/* ── Main Circular Node ── */}
-      <div className={`relative ${isShaking ? "animate-shake" : ""}`}>
-        {/* Pulsing halo ring for next-available node */}
-        {isNextAvailable && (
-          <div
-            className="absolute inset-0 rounded-full animate-pulse-ring z-0"
-            style={{
-              margin: "-8px",
-              background: skill.color || "#58CC02",
-              opacity: 0.35,
-            }}
-          />
-        )}
+      {/* ── 3D Node Button with Gray Shadow ── */}
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{ backgroundColor: shadowColor, padding: 4 }}
+      >
+        {/* Shadow layer */}
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{ backgroundColor: shadowColor, transform: "translateY(5px)" }}
+        />
 
-        {/* SVG Progress Ring (for non-locked skills) */}
-        {!skill.is_locked && (
-          <svg
-            width="84"
-            height="84"
-            className="absolute -top-[10px] -left-[10px] z-0 pointer-events-none -rotate-90"
-          >
-            {/* Track */}
-            <circle
-              cx="42" cy="42" r={radius}
-              stroke="#37464F"
-              strokeWidth={strokeWidth}
-              fill="none"
-            />
-            {/* Fill */}
-            <circle
-              cx="42" cy="42" r={radius}
-              stroke={skill.color || "#58CC02"}
-              strokeWidth={strokeWidth}
-              strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              fill="none"
-              className="transition-all duration-700 ease-out"
-            />
-          </svg>
-        )}
-
-        {/* Node Circle Button */}
+        {/* Button face */}
         <button
           onClick={handleClick}
-          aria-label={`Skill: ${skill.name}`}
-          className="w-16 h-16 rounded-full flex items-center justify-center relative z-10 transition-all duration-150 active:scale-95 active:translate-y-1 focus:outline-none"
-          style={{
-            backgroundColor: nodeColor,
-            boxShadow: nodeShadow,
-          }}
+          aria-label={isLocked ? `Locked: ${skillName}` : skillName}
+          className={`absolute inset-0 rounded-full flex items-center justify-center
+            focus:outline-none transition-transform duration-100
+            active:translate-y-1 hover:brightness-110 cursor-pointer
+            ${shaking ? "animate-shake" : ""}`}
+          style={{ backgroundColor: faceColor }}
         >
-          {skill.is_locked ? (
-            // Lock icon SVG
+          {isLocked ? (
+            /* Locked state padlock icon */
             <svg width="22" height="26" viewBox="0 0 22 26" fill="none">
-              <rect x="3" y="11" width="16" height="13" rx="2" fill="#5A6B73"/>
-              <path d="M7 11V7C7 4.79 8.79 3 11 3C13.21 3 15 4.79 15 7V11" stroke="#5A6B73" strokeWidth="2.5" strokeLinecap="round"/>
-              <circle cx="11" cy="17" r="2" fill="#3C4B52"/>
-            </svg>
-          ) : isCompleted ? (
-            // White star for completed
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-            </svg>
-          ) : isNextAvailable ? (
-            // Book/start icon for next available
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="white">
-              <path d="M12 3C8.5 3 5.73 4.46 4 6.78V20l8-3 8 3V6.78C18.27 4.46 15.5 3 12 3z" opacity="0.9"/>
-              <path d="M12 3v14" stroke="rgba(255,255,255,0.4)" strokeWidth="1"/>
+              <rect x="3" y="11" width="16" height="13" rx="3" fill="#5A6B73" />
+              <path
+                d="M7 11V7C7 4.79 8.79 3 11 3C13.21 3 15 4.79 15 7V11"
+                stroke="#5A6B73"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              <circle cx="11" cy="17" r="2" fill="#37464F" />
             </svg>
           ) : (
-            // Headphone icon for audio/listen skills
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="white">
-              <path d="M12 3C7.03 3 3 7.03 3 12v4c0 1.1.9 2 2 2h2v-6H5v-1c0-3.86 3.14-7 7-7s7 3.14 7 7v1h-2v6h2c1.1 0 2-.9 2-2v-4c0-4.97-4.03-9-9-9z"/>
-            </svg>
+            /* Official Duolingo Star SVG Icon */
+            <img
+              src="https://d35aaqx5ub95lt.cloudfront.net/images/path/icons/ef9c771afdb674f0ff82fae25c6a7b0a.svg"
+              alt="Star"
+              className="w-8 h-8 object-contain brightness-200"
+            />
           )}
         </button>
       </div>
 
-      {/* ── Skill Name Label (no truncation) ── */}
-      <span
-        className="mt-3 text-xs font-extrabold text-[var(--text-primary)] text-center leading-tight"
-        style={{ maxWidth: "96px", wordBreak: "break-word" }}
-      >
-        {skill.name}
-      </span>
-
-      {/* ── Tap-to-Preview Popover Card (in-flow, below the node) ── */}
-      {isSelected && !skill.is_locked && (
+      {/* ── Popover card on tap ── */}
+      {isSelected && !isLocked && (
         <div
-          className="relative z-30 w-60 mt-3 p-4 rounded-2xl shadow-2xl text-center animate-float-in"
-          style={{
-            background: "var(--background-secondary)",
-            border: "2px solid var(--border)",
-          }}
+          className="absolute z-50 w-60 rounded-2xl shadow-2xl bg-[#1A2C32] border-2 border-[#37464F] p-4 text-center animate-bounce-in"
+          style={{ top: NODE_DIAMETER + 14, left: "50%", transform: "translateX(-50%)" }}
         >
-          {/* Arrow pointer pointing up to node */}
-          <div
-            className="absolute left-1/2 -translate-x-1/2 -top-[9px] w-4 h-4 rotate-45"
-            style={{
-              background: "var(--background-secondary)",
-              borderTop: "2px solid var(--border)",
-              borderLeft: "2px solid var(--border)",
-            }}
-          />
-
-          {/* Skill title */}
-          <h4 className="text-base font-black text-[var(--text-primary)] mb-0.5">
-            {skill.name}
-          </h4>
-
-          {/* Status line */}
-          <p className="text-xs font-bold text-[var(--text-secondary)] mb-3">
-            {isCompleted
-              ? `Crown Level ${skill.level} • Completed!`
-              : `Lesson ${skill.completed_lessons + 1} of ${skill.total_lessons}`}
+          <div className="absolute left-1/2 -translate-x-1/2 -top-[9px] w-4 h-4 rotate-45 bg-[#1A2C32] border-t-2 border-l-2 border-[#37464F]" />
+          <p className="text-base font-black text-white mb-0.5">{skillName}</p>
+          <p className="text-xs text-[#8A9BA3] font-bold mb-4">
+            {isCompleted ? "Completed · Practice to earn XP" : "Lesson"}
           </p>
-
-          {/* CTA Button */}
-          <Link href={`/learn/${lessonToLaunch}`}>
-            <button className="btn-duo-primary w-full py-2.5 text-sm flex items-center justify-center gap-2">
-              <span>{isCompleted ? "PRACTICE" : "START"}</span>
-              <span className="bg-black/20 text-white text-[10px] px-2 py-0.5 rounded-full font-black">
-                +10 XP
-              </span>
+          <Link href={`/learn/${lessonId}`}>
+            <button className="w-full py-3 rounded-2xl bg-[#58CC02] border-b-4 border-[#46A302] text-sm font-black text-white uppercase hover:brightness-105 active:translate-y-0.5 transition-all">
+              {isCompleted ? "PRACTICE" : "START"} &nbsp;
+              <span className="bg-black/20 text-[11px] px-1.5 py-0.5 rounded-full">+10 XP</span>
             </button>
           </Link>
         </div>
-      )}
-
-      {/* ── Connector line to next node (vertical trail) ── */}
-      {!isLast && (
-        <div
-          className="w-[3px] rounded-full mt-1"
-          style={{
-            height: "28px",
-            background: skill.is_locked
-              ? "#37464F"
-              : isCompleted
-              ? (skill.color || "#58CC02")
-              : "#37464F",
-            opacity: 0.6,
-          }}
-        />
       )}
     </div>
   );

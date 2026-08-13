@@ -10,6 +10,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 
 interface UnitHeaderProps {
   unitNumber: number;
@@ -35,7 +36,7 @@ export const UnitHeader: React.FC<UnitHeaderProps> = ({
         <div className="space-y-0.5">
           <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider opacity-90">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="white" className="opacity-80">
-              <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+              <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
             </svg>
             SECTION 1, UNIT {unitNumber}
           </div>
@@ -45,16 +46,17 @@ export const UnitHeader: React.FC<UnitHeaderProps> = ({
         </div>
 
         {/* Right: Guidebook button */}
-        <button
-          onClick={() => alert(`Guidebook: ${title}`)}
-          className="flex items-center gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border-2 border-white/40 text-white font-black text-xs uppercase px-3 py-2 rounded-xl shadow-sm transition-all active:scale-95 shrink-0"
-        >
-          {/* Guidebook icon */}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-            <path d="M18 2H6C4.9 2 4 2.9 4 4v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 14H7v-2h10v2zm0-4H7v-2h10v2zm0-4H7V6h10v2z"/>
-          </svg>
-          <span>GUIDEBOOK</span>
-        </button>
+        <Link href={`/guidebook/${unitNumber}`}>
+          <button
+            className="flex items-center gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border-2 border-white/40 text-white font-black text-xs uppercase px-3 py-2 rounded-xl shadow-sm transition-all active:scale-95 shrink-0 cursor-pointer"
+          >
+            {/* Guidebook icon */}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+              <path d="M18 2H6C4.9 2 4 2.9 4 4v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 14H7v-2h10v2zm0-4H7v-2h10v2zm0-4H7V6h10v2z" />
+            </svg>
+            <span>GUIDEBOOK</span>
+          </button>
+        </Link>
       </div>
 
       {/* Divider with unit description centered */}

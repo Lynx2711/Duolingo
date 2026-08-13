@@ -118,17 +118,20 @@ def get_course_path(course_id: int, user_id: int, db: Session = Depends(get_db))
 
             # Append the structured skill data to our unit's skill list
             result_skills.append({
-                "id": skill.id, # Skill ID
-                "unit_id": skill.unit_id, # Parent Unit ID (required by SkillResponse schema)
-                "name": skill.name, # Skill Name
-                "icon_url": skill.icon_url, # Icon for UI
-                "color": skill.color, # Color for UI
-                "order": skill.order, # Order in unit
-                "level": level, # Computed level
-                "completed_lessons": completed_lessons, # Computed completed lessons
-                "total_lessons": total_lessons, # Total lessons
-                "is_locked": is_locked, # Computed locked status
-                "next_lesson_id": next_lesson_id # Next lesson ID for launching
+                "id": skill.id,
+                "unit_id": skill.unit_id,
+                "name": skill.name,
+                "icon_url": skill.icon_url,
+                "color": skill.color,
+                "order": skill.order,
+                "level": level,
+                "completed_lessons": completed_lessons,
+                "total_lessons": total_lessons,
+                "is_locked": is_locked,
+                "next_lesson_id": next_lesson_id,
+                # Full ordered list of lesson IDs for this skill — the frontend
+                # renders each lesson as a separate path node instead of one node per skill.
+                "lesson_ids": [l.id for l in skill_lessons],
             })
             
             # Update previous_skill_completed for the NEXT skill in the iteration
@@ -154,3 +157,93 @@ def get_course_path(course_id: int, user_id: int, db: Session = Depends(get_db))
         "icon_url": course.icon_url, # Course Icon
         "units": result_units # Structured units with calculated progress
     }
+
+# Define GET endpoint for unit guidebook (key phrases & grammar tips)
+@router.get("/units/{unit_id}/guidebook")
+def get_unit_guidebook(unit_id: int, db: Session = Depends(get_db)) -> Any:
+    unit = db.query(Unit).filter(Unit.id == unit_id).first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unit not found")
+
+    guidebooks = {
+        1: {
+            "unit_id": 1,
+            "unit_number": 1,
+            "title": "Basics",
+            "description": "Explore grammar tips and key phrases for this unit",
+            "color": "#58CC02",
+            "key_phrases": [
+                {"phrase": "¡Hola! ¿Cómo estás?", "translation": "Hello! How are you?"},
+                {"phrase": "Buenos días, mucho gusto.", "translation": "Good morning, nice to meet you."},
+                {"phrase": "Yo soy estudiante.", "translation": "I am a student."},
+                {"phrase": "Muchas gracias, adiós.", "translation": "Thank you very much, goodbye."}
+            ],
+            "grammar_tips": [
+                {
+                    "title": "Gender of Nouns",
+                    "content": "In Spanish, all nouns are either masculine or feminine. Masculine nouns usually end in -o (el chico, el libro) and use 'el'. Feminine nouns usually end in -a (la chica, la casa) and use 'la'."
+                },
+                {
+                    "title": "Basic Subject Pronouns",
+                    "content": "Yo = I, Tú = You (informal), Él = He, Ella = She, Nosotros = We, Ellos = They."
+                }
+            ]
+        },
+        2: {
+            "unit_id": 2,
+            "unit_number": 2,
+            "title": "Travel",
+            "description": "Navigate your way through Spanish-speaking countries",
+            "color": "#CE82FF",
+            "key_phrases": [
+                {"phrase": "¿Dónde está el baño?", "translation": "Where is the bathroom?"},
+                {"phrase": "Gira a la derecha.", "translation": "Turn to the right."},
+                {"phrase": "Necesito un taxi, por favor.", "translation": "I need a taxi, please."},
+                {"phrase": "El tren llega a las tres.", "translation": "The train arrives at three."}
+            ],
+            "grammar_tips": [
+                {
+                    "title": "Using 'Estar' for Location",
+                    "content": "Use the verb 'estar' to express where people or things are located: 'La tienda está cerca' (The store is nearby)."
+                }
+            ]
+        },
+        3: {
+            "unit_id": 3,
+            "unit_number": 3,
+            "title": "Food",
+            "description": "Order food and cook in Spanish",
+            "color": "#1CB0F6",
+            "key_phrases": [
+                {"phrase": "Una mesa para dos, por favor.", "translation": "A table for two, please."},
+                {"phrase": "Quiero un vaso de agua.", "translation": "I want a glass of water."},
+                {"phrase": "La cuenta, por favor.", "translation": "The bill, please."},
+                {"phrase": "Me gusta la comida mexicana.", "translation": "I like Mexican food."}
+            ],
+            "grammar_tips": [
+                {
+                    "title": "Polite Ordering",
+                    "content": "To order food politely in Spanish, use 'Quisiera' or 'Quiero... por favor'."
+                }
+            ]
+        }
+    }
+
+    # Return default guidebook if custom doesn't exist
+    return guidebooks.get(unit_id, {
+        "unit_id": unit.id,
+        "unit_number": unit.order,
+        "title": unit.title,
+        "description": "Explore grammar tips and key phrases for this unit",
+        "color": unit.color,
+        "key_phrases": [
+            {"phrase": f"Frase clave en {unit.title}", "translation": f"Key phrase in {unit.title}"}
+        ],
+        "grammar_tips": [
+            {
+                "title": f"Tips for {unit.title}",
+                "content": f"Grammar tips and guidance for {unit.title}."
+            }
+        ]
+    })
+

@@ -167,9 +167,23 @@ def check_answer(lesson_id: int, check: AnswerCheck, db: Session = Depends(get_d
                 is_correct = False
     else:
         # All other types: case-insensitive, whitespace-stripped string comparison
-        user_ans = str(check.user_answer).strip().lower() if check.user_answer is not None else ""
+        if isinstance(check.user_answer, list):
+            user_ans = " ".join([str(item).strip() for item in check.user_answer]).strip().lower()
+        else:
+            user_ans = str(check.user_answer).strip().lower() if check.user_answer is not None else ""
+        
         correct_ans = str(exercise.correct_answer).strip().lower() if exercise.correct_answer else ""
-        is_correct = user_ans == correct_ans
+        
+        # Helper to normalize string for comparison (removes accents/punctuation like ¡!¿?.,)
+        def normalize_str(s: str) -> str:
+            import unicodedata, re
+            s_norm = unicodedata.normalize('NFD', s)
+            s_clean = ''.join(c for c in s_norm if unicodedata.category(c) != 'Mn')
+            return re.sub(r'[^\w\s]', '', s_clean).strip()
+        
+        # Primary check: exact match
+        # Fallback check: normalized match (handles missing accents or punctuation)
+        is_correct = (user_ans == correct_ans) or (normalize_str(user_ans) == normalize_str(correct_ans))
 
     # 4. Log outcome to the attempt row — THIS is the critical security step.
     #    The server owns these numbers; the client never sends them at /complete.
@@ -287,9 +301,12 @@ def complete_lesson(
             # Increment completed lesson count for this skill
             skill_prog.completed_lessons += 1
 
-        # Crown-up if all lessons in this skill are completed at the current level
+        # Cap completed_lessons so retrying a fully-completed skill doesn't inflate the counter
+        skill_prog.completed_lessons = min(skill_prog.completed_lessons, skill_prog.total_lessons)
+
+        # Crown-up if all lessons in this skill are done. Level caps at 1 for this clone.
         if skill_prog.completed_lessons >= skill_prog.total_lessons:
-            skill_prog.level = min(skill_prog.level + 1, 5)  # cap at crown level 5
+            skill_prog.level = 1  # cap at 1 — prevents level inflation from repeated completes
             skill_prog.completed_at = datetime.now(timezone.utc)
 
     # 7. Commit all changes atomically (attempt close, user stats, skill progress)
