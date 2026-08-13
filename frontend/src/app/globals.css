@@ -1,0 +1,288 @@
+/* ===================================================================
+   globals.css — Duolingo Clone Global Styles
+   
+   This file defines the global CSS for the entire application.
+   It includes:
+   1. Tailwind CSS directives (base, components, utilities)
+   2. CSS custom properties (variables) for light and dark modes
+   3. Base styles that mimic Duolingo's design system
+   4. Utility classes for common Duolingo UI patterns
+   =================================================================== */
+
+/* Import Tailwind's base styles — normalizes browser defaults */
+@tailwind base;
+/* Import Tailwind's component classes — pre-built component styles */
+@tailwind components;
+/* Import Tailwind's utility classes — atomic CSS utilities */
+@tailwind utilities;
+
+/* Import Nunito font from Google Fonts as a fallback for DIN Round */
+/* Nunito is visually similar to DIN Round (rounded, friendly, geometric) */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+/* ===================================================================
+   CSS Custom Properties — Light Mode (Default)
+   These variables power the entire color system and can be swapped
+   by the .dark class for dark mode support.
+   =================================================================== */
+:root {
+  /* --- Background colors --- */
+  --background: #FFFFFF;           /* Main page background — Snow white like Duolingo */
+  --background-secondary: #F7F7F7; /* Secondary background for cards — Polar light gray */
+  --background-hover: #F0F0F0;     /* Hover state for interactive areas */
+
+  /* --- Text colors --- */
+  --text-primary: #4B4B4B;    /* Primary text — Eel dark gray (softer than pure black) */
+  --text-secondary: #777777;  /* Secondary text — Wolf medium gray */
+  --text-tertiary: #AFAFAF;   /* Tertiary text — Hare light gray (placeholders, hints) */
+
+  /* --- Border colors --- */
+  --border: #E5E5E5;           /* Standard border — Swan light gray */
+  --border-strong: #D0D0D0;   /* Emphasized border for active/focused states */
+
+  /* --- Interactive element colors --- */
+  --button-primary: #58CC02;         /* Primary CTA button — Feather Green */
+  --button-primary-hover: #61E002;   /* Hover state for primary button */
+  --button-primary-shadow: #46A302;  /* 3D bottom shadow for primary button */
+
+  /* --- Feedback colors --- */
+  --correct-bg: #D7FFB8;        /* Background for correct answer feedback */
+  --correct-text: #58A700;       /* Text color for correct answer feedback */
+  --incorrect-bg: #FFDFE0;       /* Background for wrong answer feedback */
+  --incorrect-text: #EA2B2B;     /* Text color for wrong answer feedback */
+
+  /* --- Sidebar / Top bar --- */
+  --sidebar-bg: #FFFFFF;          /* Sidebar background */
+  --topbar-bg: #FFFFFF;           /* Top navigation bar background */
+  --topbar-border: #E5E5E5;       /* Top bar bottom border */
+}
+
+/* ===================================================================
+   CSS Custom Properties — Dark Mode
+   Applied when the <html> or <body> element has the 'dark' class.
+   Uses Duolingo's actual dark mode color palette.
+   =================================================================== */
+.dark {
+  /* --- Background colors — deep teal/charcoal like Duolingo dark mode --- */
+  --background: #131F24;
+  --background-secondary: #1A2C32;
+  --background-hover: #233A42;
+
+  /* --- Text colors — lighter for contrast on dark backgrounds --- */
+  --text-primary: #D1D8DB;
+  --text-secondary: #8A9BA3;
+  --text-tertiary: #5A6B73;
+
+  /* --- Border colors --- */
+  --border: #37464F;
+  --border-strong: #4A5C66;
+
+  /* --- Interactive elements stay vibrant in dark mode --- */
+  --button-primary: #58CC02;
+  --button-primary-hover: #61E002;
+  --button-primary-shadow: #46A302;
+
+  /* --- Feedback colors — slightly muted for dark backgrounds --- */
+  --correct-bg: #1B3A1B;
+  --correct-text: #7AC70C;
+  --incorrect-bg: #3A1B1B;
+  --incorrect-text: #FF6B6B;
+
+  /* --- Sidebar / Top bar --- */
+  --sidebar-bg: #1A2C32;
+  --topbar-bg: #131F24;
+  --topbar-border: #37464F;
+}
+
+/* ===================================================================
+   Base Layer Styles
+   These override Tailwind's default base styles with Duolingo-specific
+   defaults for typography, colors, and element behavior.
+   =================================================================== */
+@layer base {
+  /* Set the root HTML element to use our CSS variables for seamless theming */
+  html {
+    /* Use the CSS variable for background so dark mode works automatically */
+    background-color: var(--background);
+    /* Set the primary text color from our CSS variables */
+    color: var(--text-primary);
+    /* Use Nunito as the base font (closest free alternative to DIN Round) */
+    font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+    /* Smooth transitions when toggling dark mode */
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Style all headings with Duolingo's bold, confident typography */
+  h1, h2, h3, h4, h5, h6 {
+    /* Extra-bold weight to match Duolingo's "Feather Bold" heading style */
+    font-weight: 800;
+    /* Eel dark color for headings — stands out from body text */
+    color: var(--text-primary);
+    /* Slightly tighter letter-spacing for large text (Duolingo convention) */
+    letter-spacing: -0.02em;
+  }
+
+  /* Style all buttons with Duolingo's characteristic rounded, tactile feel */
+  button {
+    /* Nunito to maintain visual consistency across all interactive elements */
+    font-family: 'Nunito', system-ui, sans-serif;
+    /* Bold text on buttons for clear CTAs */
+    font-weight: 700;
+    /* Remove default button border */
+    border: none;
+    /* Pointer cursor to clearly indicate interactivity */
+    cursor: pointer;
+    /* Smooth transition for hover/active states */
+    transition: all 0.15s ease;
+  }
+
+  /* Remove spinner arrows from number inputs for cleaner exercise inputs */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+/* ===================================================================
+   Component Layer — Reusable Duolingo-Style Component Classes
+   These are used via @apply or directly as class names throughout
+   the application for consistent styling.
+   =================================================================== */
+@layer components {
+  /* --- Duolingo's signature 3D "raised" button --- */
+  /* The 4px bottom shadow/border creates a tactile, pressable appearance */
+  .btn-duo-primary {
+    @apply bg-feather text-white font-bold py-3 px-8 rounded-duo-md
+           shadow-duo-green uppercase tracking-wider text-sm
+           hover:brightness-105
+           active:translate-y-[4px] active:shadow-none
+           disabled:bg-swan disabled:shadow-duo-disabled disabled:text-hare
+           disabled:cursor-not-allowed;
+  }
+
+  /* Secondary button style — gray/outlined for less prominent actions */
+  .btn-duo-secondary {
+    @apply bg-white text-eel font-bold py-3 px-8 rounded-duo-md
+           border-2 border-swan shadow-duo-gray uppercase tracking-wider text-sm
+           hover:bg-polar
+           active:translate-y-[4px] active:shadow-none;
+  }
+
+  /* Danger button style — red for destructive/incorrect actions */
+  .btn-duo-danger {
+    @apply bg-cardinal text-white font-bold py-3 px-8 rounded-duo-md
+           shadow-duo-red uppercase tracking-wider text-sm
+           hover:brightness-105
+           active:translate-y-[4px] active:shadow-none;
+  }
+
+  /* --- Card component for Duolingo-style content containers --- */
+  .card-duo {
+    @apply bg-[var(--background-secondary)] rounded-duo-lg border-2 border-[var(--border)]
+           shadow-duo-card p-duo-4;
+  }
+
+  /* --- Top bar component matching Duolingo's sticky header --- */
+  .topbar-duo {
+    @apply fixed top-0 left-0 right-0 h-16 bg-[var(--topbar-bg)]
+           border-b-2 border-[var(--topbar-border)] z-50
+           flex items-center justify-between px-duo-4;
+  }
+
+  /* --- Word bank chip for translate exercises --- */
+  /* These are the tappable word tiles in Duolingo's word bank exercises */
+  .word-chip {
+    @apply inline-flex items-center px-3 py-2 rounded-duo-md
+           bg-white border-2 border-swan shadow-duo-gray
+           text-eel font-bold text-sm cursor-pointer select-none
+           hover:bg-polar
+           active:translate-y-[2px] active:shadow-none
+           transition-all duration-150;
+  }
+
+  /* Dark mode variant for word chips */
+  .dark .word-chip {
+    @apply bg-dark-elevated border-dark-border text-dark-text;
+  }
+
+  /* --- Progress bar (lesson progress at the top) --- */
+  .progress-bar-duo {
+    @apply h-4 bg-swan rounded-duo-pill overflow-hidden;
+  }
+
+  /* The filled portion of the progress bar */
+  .progress-bar-duo-fill {
+    @apply h-full bg-feather rounded-duo-pill transition-all duration-500 ease-out;
+  }
+
+  /* --- Correct/Incorrect feedback bars at the bottom of the screen --- */
+  .feedback-correct {
+    @apply bg-[var(--correct-bg)] border-t-2 border-[var(--correct-text)]
+           text-[var(--correct-text)] p-duo-4;
+  }
+
+  .feedback-incorrect {
+    @apply bg-[var(--incorrect-bg)] border-t-2 border-[var(--incorrect-text)]
+           text-[var(--incorrect-text)] p-duo-4;
+  }
+}
+
+/* ===================================================================
+   Utility Layer — Custom Utility Classes
+   Small, single-purpose classes for edge cases not covered by Tailwind.
+   =================================================================== */
+@layer utilities {
+  /* Balanced text wrapping for better readability on headings */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Hide scrollbar while keeping scrollability (for horizontal skill paths) */
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;     /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;             /* Chrome, Safari, and Opera */
+  }
+
+  /* Duolingo-style text shadow for important headings */
+  .text-shadow-duo {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* ===================================================================
+   Global keyframes (used by inline styles and Tailwind animations)
+   =================================================================== */
+@keyframes owl-jump {
+  0%, 100% { transform: translateY(0px); }
+  40%       { transform: translateY(-10px); }
+  60%       { transform: translateY(-7px); }
+}
+
+@keyframes pulse-ring {
+  0%   { transform: scale(1);    opacity: 0.8; }
+  50%  { transform: scale(1.18); opacity: 0.3; }
+  100% { transform: scale(1);    opacity: 0.8; }
+}
+
+@keyframes float-in {
+  0%   { transform: translateY(8px) scale(0.97); opacity: 0; }
+  100% { transform: translateY(0) scale(1);       opacity: 1; }
+}
+
+@keyframes bounce-in {
+  0%   { transform: scale(0.3); opacity: 0; }
+  50%  { transform: scale(1.05); }
+  70%  { transform: scale(0.9); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes shake {
+  0%, 100%                       { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90%        { transform: translateX(-4px); }
+  20%, 40%, 60%, 80%             { transform: translateX(4px); }
+}
+
