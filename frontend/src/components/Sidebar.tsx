@@ -202,6 +202,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey }) => {
 
         </div>
       </aside>
+
+      {/* ── MODE 3: Mobile Bottom Navigation Bar (mobile screens < md) ── */}
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#131F24] border-t-2 border-[#37464F] flex items-center justify-around z-40 select-none md:hidden px-2">
+        {NAV_ITEMS.map((item) => {
+          const active = isItemActive(item.key, item.href);
+          return (
+            <Link key={item.key} href={item.href} aria-label={item.label} className="focus:outline-none">
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all border-2 ${
+                  active ? "bg-[#1CB0F6]/10 border-[#1CB0F6]" : "border-transparent"
+                }`}
+              >
+                {item.isProfile ? (
+                  <div className="w-7 h-7 rounded-full bg-[#58CC02] flex items-center justify-center text-white font-black text-xs">
+                    A
+                  </div>
+                ) : item.isMore ? (
+                  <div className="w-7 h-7 rounded-full bg-[#CE82FF]/20 flex items-center justify-center text-[#CE82FF] font-black text-xs">
+                    •••
+                  </div>
+                ) : (
+                  <img src={item.iconUrl} alt={item.label} className="w-6 h-6 object-contain" />
+                )}
+              </div>
+            </Link>
+          );
+        })}
+      </nav>
     </>
   );
 };

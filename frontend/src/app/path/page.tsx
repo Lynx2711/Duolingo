@@ -153,14 +153,7 @@ export default function PathPage() {
         {/* Center Column */}
         {/* ml offsets match sidebar widths: 88px collapsed, 256px expanded */}
         <main
-          className={[
-            "flex-1",
-            "ml-[88px] lg:ml-[256px]",
-            "flex justify-center",
-            "overflow-y-auto",
-            "px-3 sm:px-4 md:px-6",
-            "pt-4 pb-10",
-          ].join(" ")}
+          className="flex-1 ml-0 md:ml-20 lg:ml-[200px] flex justify-center overflow-y-auto px-3 sm:px-4 md:px-6 pt-4 pb-24 md:pb-10"
           onClick={(e) => {
             if (e.target === e.currentTarget) setSelectedId(null);
           }}
