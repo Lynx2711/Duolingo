@@ -116,7 +116,7 @@ export default function PathPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const fetchData = async (retries = 2) => {
+  const fetchData = async (retries = 10) => {
     try {
       setLoading(true);
       setError(null);
@@ -126,13 +126,13 @@ export default function PathPage() {
       ]);
       setCoursePath(path as CoursePathData);
       setUser(u as UserData);
+      setLoading(false);
     } catch (e: unknown) {
       if (retries > 0) {
-        setTimeout(() => fetchData(retries - 1), 1500);
+        setTimeout(() => fetchData(retries - 1), 2000);
         return;
       }
       setError(e instanceof Error ? e.message : "Failed to load");
-    } finally {
       setLoading(false);
     }
   };
