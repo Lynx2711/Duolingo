@@ -65,6 +65,11 @@ app.include_router(progress.router) # Skill progress tracking
 app.include_router(leaderboard.router) # Global leaderboard
 app.include_router(profile.router) # User profiles
 
+# Root endpoint for browser checks
+@app.get("/")
+def root():
+    return {"status": "ok", "app_name": settings.APP_NAME, "docs_url": "/docs"}
+
 # Ensure the server runs when executed directly
 if __name__ == "__main__":
     # Start the uvicorn ASGI server with hot reloading enabled
