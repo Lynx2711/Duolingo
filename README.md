@@ -4,6 +4,14 @@ A full-stack, gamified language learning web application that accurately recreat
 
 ---
 
+## 🌐 Live Deployments
+
+- 📱 **Frontend Web Application (Vercel):** [https://duolingo-dun.vercel.app/](https://duolingo-dun.vercel.app/)
+- ⚙️ **Backend REST API (Render):** [https://duolingo-backend-vrcj.onrender.com](https://duolingo-backend-vrcj.onrender.com)
+- 📖 **Interactive API Documentation (Swagger UI):** [https://duolingo-backend-vrcj.onrender.com/docs](https://duolingo-backend-vrcj.onrender.com/docs)
+
+---
+
 ## 🛠️ Technical Stack
 
 - **Frontend**: Next.js 14 (App Router, TypeScript, React 18)
