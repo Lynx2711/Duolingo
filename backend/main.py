@@ -1,3 +1,9 @@
+import sys
+import os
+
+# Ensure backend directory is in sys.path so modules like core, models, schemas, api can be imported reliably
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 # Import FastAPI and its lifecycle tools
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
