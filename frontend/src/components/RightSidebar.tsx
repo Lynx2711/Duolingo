@@ -120,7 +120,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ user }) => {
                   Silver League
                 </h4>
                 <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                  Complete a lesson to join this week's leaderboard!
+                  Complete a lesson to join this week&apos;s leaderboard!
                 </p>
               </div>
               <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center rounded-xl"
