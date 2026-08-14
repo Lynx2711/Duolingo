@@ -4,11 +4,15 @@
 // /start -> attempt_id -> /check-answer (with attempt_id) -> /complete (with attempt_id only)
 
 const API_BASE_URL: string =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://duolingo-backend-vrcj.onrender.com";
 
 // Generic typed fetch wrapper with error handling
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const baseUrl = API_BASE_URL.replace(/\/+$/, "");
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const url = `${baseUrl}${cleanEndpoint}`;
   const response = await fetch(url, {
     ...options,
     headers: { "Content-Type": "application/json", ...options.headers },

@@ -55,11 +55,15 @@ app = FastAPI(
     redoc_url="/redoc" # Explicit ReDoc route
 )
 
-# Configure Cross-Origin Resource Sharing (CORS) so the frontend can interact with this API
+# Configure Cross-Origin Resource Sharing (CORS) — securely whitelist Vercel production & preview domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_origin_regex=".*",
+    allow_origins=[
+        "https://duolingo-dun.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:8000",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app", # Safely allow all Vercel deployment URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
