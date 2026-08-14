@@ -174,15 +174,18 @@ def check_answer(lesson_id: int, check: AnswerCheck, db: Session = Depends(get_d
         
         correct_ans = str(exercise.correct_answer).strip().lower() if exercise.correct_answer else ""
         
-        # Helper to normalize string for comparison (removes accents/punctuation like ¡!¿?.,)
+        # Helper to normalize string for comparison (removes accents, punctuation ¡!¿?., extra spaces, and handles case)
         def normalize_str(s: str) -> str:
             import unicodedata, re
+            if not s:
+                return ""
             s_norm = unicodedata.normalize('NFD', s)
             s_clean = ''.join(c for c in s_norm if unicodedata.category(c) != 'Mn')
-            return re.sub(r'[^\w\s]', '', s_clean).strip()
+            s_no_punct = re.sub(r'[^\w\s]', '', s_clean)
+            return re.sub(r'\s+', ' ', s_no_punct).strip().lower()
         
         # Primary check: exact match
-        # Fallback check: normalized match (handles missing accents or punctuation)
+        # Fallback check: normalized match (handles case, missing accents, punctuation, or spaces)
         is_correct = (user_ans == correct_ans) or (normalize_str(user_ans) == normalize_str(correct_ans))
 
     # 4. Log outcome to the attempt row — THIS is the critical security step.

@@ -32,10 +32,20 @@ async def lifespan(app: FastAPI):
     try:
         # Import User locally to avoid circular imports if needed, though safe here
         from models.user import User
+        from models.lesson import Exercise
+        import re
         # Check if the database is empty (no users exist)
         if not db.query(User).first():
             # If empty, run the seed script to populate default courses and users
             seed_database(db)
+        else:
+            # Normalize existing database exercise answers (strip trailing periods/punctuation)
+            for ex in db.query(Exercise).filter(Exercise.correct_answer != None).all():
+                if ex.correct_answer:
+                    cleaned = ex.correct_answer.rstrip('.!?, ')
+                    if cleaned != ex.correct_answer:
+                        ex.correct_answer = cleaned
+            db.commit()
     finally:
         # Close the DB session to prevent memory leaks
         db.close()
