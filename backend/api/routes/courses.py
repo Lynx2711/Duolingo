@@ -18,6 +18,7 @@ from typing import List, Dict, Any
 router = APIRouter(prefix="/api/courses", tags=["Courses"])
 
 # Define GET endpoint to list all available courses
+@router.get("", response_model=List[CourseResponse])
 @router.get("/", response_model=List[CourseResponse])
 def get_courses(db: Session = Depends(get_db)) -> List[CourseResponse]:
     # Query all courses from the database

@@ -50,7 +50,9 @@ app = FastAPI(
     title=settings.APP_NAME, # Application title from settings
     description="Backend API for Duolingo Clone", # Short description
     version="1.0.0", # API version
-    lifespan=lifespan # Attach the lifespan context manager for startup tasks
+    lifespan=lifespan, # Attach the lifespan context manager for startup tasks
+    docs_url="/docs", # Explicit Swagger UI route
+    redoc_url="/redoc" # Explicit ReDoc route
 )
 
 # Configure Cross-Origin Resource Sharing (CORS) so the frontend can interact with this API
