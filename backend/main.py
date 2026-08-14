@@ -58,10 +58,11 @@ app = FastAPI(
 # Configure Cross-Origin Resource Sharing (CORS) so the frontend can interact with this API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS, # Allow specific origins from config
-    allow_credentials=True, # Allow cookies/auth headers
-    allow_methods=["*"], # Allow all HTTP methods (GET, POST, etc)
-    allow_headers=["*"], # Allow all headers
+    allow_origins=["*"],
+    allow_origin_regex=".*",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include all the API routers to register their endpoints
