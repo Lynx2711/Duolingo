@@ -85,15 +85,39 @@ export default function RootLayout({
   return (
     // lang="en" helps screen readers pick the correct pronunciation engine
     // suppressHydrationWarning: DarkModeProvider may change className client-side
-    <html lang="en" suppressHydrationWarning>
+    // className="dark" ensures dark bg is applied server-side before JS runs
+    <html lang="en" suppressHydrationWarning className="dark">
+      {/*
+        Blocking inline script — runs synchronously before any paint.
+        Reads localStorage and sets the correct theme class immediately,
+        preventing a white flash for dark-mode users on first load.
+      */}
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(){
+                var t=localStorage.getItem('duo-theme');
+                if(t==='light'){
+                  document.documentElement.classList.remove('dark');
+                }else{
+                  document.documentElement.classList.add('dark');
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body
         // Apply Nunito via the CSS variable AND as a direct class
         // antialiased: enables sub-pixel font smoothing for crisper text
-        className={`${nunito.variable} font-[family-name:var(--font-nunito)] antialiased`}
+        // bg-[#131F24] is the dark-mode background — fallback before CSS vars resolve
+        className={`${nunito.variable} font-[family-name:var(--font-nunito)] antialiased bg-[#131F24]`}
+        style={{ background: "var(--background)" }}
       >
         {/*
-          DarkModeProvider runs useEffect on mount to read localStorage('duo-theme')
-          and add/remove the 'dark' class on <html>. All pages get themed correctly.
+          DarkModeProvider still handles runtime theme toggling.
+          The inline script above handles the critical first paint.
         */}
         <DarkModeProvider>
           {children}

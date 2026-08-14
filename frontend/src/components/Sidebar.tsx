@@ -24,7 +24,7 @@ const NAV_ITEMS = [
     key: "learn",
     label: "LEARN",
     href: "/path",
-    iconUrl: "https://d35aaqx5ub95lt.cloudfront.net/vendor/784035717e2ff1d448c0f6cc4efc89fb.svg",
+    iconUrl: "https://d35aaqx5ub95lt.cloudfront.net/vendor/59a90a2cedd48b751a8fd22014768fd7.svg",
   },
   {
     key: "leaderboards",
@@ -71,8 +71,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey }) => {
 
   return (
     <>
-      {/* ── MODE 1: Collapsed Icon-Strip Sidebar (md–xl: width 80px) ── */}
-      <aside className="w-20 fixed left-0 top-0 bottom-0 bg-[#131F24] border-r-2 border-[#37464F] py-5 flex flex-col items-center justify-between z-40 select-none hidden md:flex xl:hidden">
+      {/* ── MODE 1: Collapsed Icon-Strip Sidebar (md–lg: width 80px) ── */}
+      <aside className="w-20 fixed left-0 top-0 bottom-0 bg-[#131F24] border-r-2 border-[#37464F] py-5 flex flex-col items-center justify-between z-40 select-none hidden md:flex lg:hidden">
         <div className="flex flex-col items-center gap-6 w-full">
           {/* Duo Owl Face Logo */}
           <Link
@@ -97,8 +97,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey }) => {
                   <Link href={item.href} aria-label={item.label} className="focus:outline-none">
                     <div
                       className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all border-2 ${active
-                          ? "bg-[#1CB0F6]/10 border-[#1CB0F6]"
-                          : "border-transparent hover:bg-[#1A2C32]"
+                        ? "bg-[#1CB0F6]/10 border-[#1CB0F6]"
+                        : "border-transparent hover:bg-[#1A2C32]"
                         }`}
                     >
                       {item.isProfile ? (
@@ -130,17 +130,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey }) => {
         </div>
       </aside>
 
-      {/* ── MODE 2: Expanded Sidebar (xl and up: width 240px) ── */}
-      <aside className="w-[240px] fixed left-0 top-0 bottom-0 bg-[#131F24] border-r-2 border-[#37464F] px-4 py-6 flex flex-col justify-between z-40 select-none hidden xl:flex">
-        <div className="flex flex-col gap-8">
-          {/* Duolingo Text Logo */}
-          <Link href="/path" className="px-3 flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <img
-              src="https://d35aaqx5ub95lt.cloudfront.net/vendor/0cecd302cf0bcd0f73d51768feff75fe.svg"
-              alt="Duolingo"
-              className="h-8 object-contain"
-            />
-          </Link>
+      {/* ── MODE 2: Expanded Sidebar (>= lg, 256px wide) ── */}
+      <aside className="w-[256px] fixed left-0 top-0 bottom-0 bg-[#131F24] border-r-2 border-[#37464F] flex flex-col z-40 select-none hidden lg:flex">
+
+        {/* Logo header row — 72px, single source of truth for the wordmark */}
+        <Link
+          href="/path"
+          className="h-[72px] px-5 flex items-center gap-3 border-b-2 border-[#37464F] shrink-0 hover:opacity-80 transition-opacity"
+        >
+          <img
+            src="https://d35aaqx5ub95lt.cloudfront.net/vendor/70a4be81077a8037698067f583816ff9.svg"
+            alt="Duo Owl"
+            className="w-10 h-10 object-contain"
+          />
+          <span className="font-black text-2xl tracking-tight text-[#58CC02] lowercase">
+            duolingo
+          </span>
+        </Link>
+
+        {/* Scrollable body: nav items + bottom promo */}
+        <div className="flex flex-col flex-1 justify-between px-4 py-6 overflow-y-auto">
 
           {/* Navigation Items with Labels */}
           <nav className="flex flex-col gap-2">
@@ -152,8 +161,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey }) => {
                   key={item.key}
                   href={item.href}
                   className={`flex items-center gap-4 px-4 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all border-2 ${active
-                      ? "bg-[#1CB0F6]/10 border-[#1CB0F6] text-[#1CB0F6]"
-                      : "border-transparent text-[#8A9BA3] hover:bg-[#1A2C32] hover:text-white"
+                    ? "bg-[#1CB0F6]/10 border-[#1CB0F6] text-[#1CB0F6]"
+                    : "border-transparent text-[#8A9BA3] hover:bg-[#1A2C32] hover:text-white"
                     }`}
                 >
                   {item.isProfile ? (
@@ -176,20 +185,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeKey }) => {
               );
             })}
           </nav>
-        </div>
 
-        {/* Bottom Promo Card: Want to learn chess? */}
-        <div className="bg-[#1A2C32] border-2 border-[#37464F] rounded-2xl p-4 text-center space-y-2">
-          <div className="text-3xl">♟️</div>
-          <h4 className="text-sm font-black text-white leading-tight">
-            Want to learn chess?
-          </h4>
-          <p className="text-xs font-bold text-[#8A9BA3]">
-            Duolingo makes it easy!
-          </p>
-          <button className="text-xs font-black text-[#1CB0F6] uppercase hover:underline pt-1">
-            TRY CHESS
-          </button>
+          {/* Bottom Promo Card */}
+          <div className="bg-[#1A2C32] border-2 border-[#37464F] rounded-2xl p-4 text-center space-y-2">
+            <div className="text-3xl">♟️</div>
+            <h4 className="text-sm font-black text-white leading-tight">
+              Want to learn chess?
+            </h4>
+            <p className="text-xs font-bold text-[#8A9BA3]">
+              Duolingo makes it easy!
+            </p>
+            <button className="text-xs font-black text-[#1CB0F6] uppercase hover:underline pt-1">
+              TRY CHESS
+            </button>
+          </div>
+
         </div>
       </aside>
     </>

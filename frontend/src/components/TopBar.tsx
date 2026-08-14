@@ -35,8 +35,16 @@ export const TopBar: React.FC<TopBarProps> = ({ user, onUserUpdate }) => {
           background: "var(--topbar-bg)",
         }}
       >
-        {/* Left spacer matching sidebar */}
-        <div className="flex-1" />
+        {/* Duolingo logo — only on md (icon-strip mode). At lg+ the expanded sidebar already shows it. */}
+        <div className="flex items-center flex-1">
+          <a href="/path" className="hidden md:flex lg:hidden items-center">
+            <img
+              src="https://d35aaqx5ub95lt.cloudfront.net/vendor/0cecd302cf0bcd0f73d51768feff75fe.svg"
+              alt="Duolingo"
+              className="h-6 object-contain"
+            />
+          </a>
+        </div>
 
         {/* Right: Gamification Stats Bar (Matches reference screenshot) */}
         <div className="flex items-center gap-6 ml-auto">

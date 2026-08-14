@@ -50,4 +50,3 @@ backend/alembic/versions/__pycache__/
 *.log
 assignment.txt
 solve.py
-backend/test_*.py

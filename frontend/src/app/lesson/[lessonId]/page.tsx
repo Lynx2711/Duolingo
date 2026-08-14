@@ -623,7 +623,7 @@ function WordBankExercise({
 
   return (
     <div className="w-full space-y-8">
-      <div className="min-h-[72px] border-b-2 border-[#37464F] pb-3 flex flex-wrap gap-2.5 items-end justify-start">
+      <div className="min-h-[80px] border-b-2 border-[#37464F] pb-3 flex flex-wrap gap-3 items-end justify-start">
         {selected.length === 0 && (
           <span className="text-[#5A6B73] font-bold text-sm italic py-2">
             Tap the words below to form your answer...
@@ -634,7 +634,7 @@ function WordBankExercise({
             key={i}
             onClick={() => !disabled && onRemoveChip(i)}
             disabled={disabled}
-            className="px-4 py-2.5 rounded-2xl bg-[#1A2C32] border-2 border-[#37464F] text-white font-extrabold text-sm shadow-md hover:border-[#1CB0F6] active:scale-95 transition-all"
+            className="px-5 py-3 rounded-2xl bg-[#1A2C32] border-2 border-[#37464F] text-white font-extrabold text-base shadow-md hover:border-[#1CB0F6] active:scale-95 transition-all"
           >
             {word}
           </button>
@@ -649,7 +649,7 @@ function WordBankExercise({
             return (
               <div
                 key={bankIdx}
-                className="px-4 py-2.5 rounded-2xl bg-[#1A2C32]/40 border-2 border-[#37464F]/40 text-transparent font-extrabold text-sm select-none"
+                className="px-5 py-3 rounded-2xl bg-[#1A2C32]/40 border-2 border-[#37464F]/40 text-transparent font-extrabold text-base select-none"
               >
                 {word}
               </div>
@@ -661,7 +661,7 @@ function WordBankExercise({
               key={bankIdx}
               onClick={() => !disabled && onSelectChip(word)}
               disabled={disabled}
-              className="px-4 py-2.5 rounded-2xl bg-[#1A2C32] border-2 border-[#37464F] text-white font-extrabold text-sm shadow-md hover:border-[#1CB0F6] hover:bg-[#233A42] active:scale-95 transition-all"
+              className="px-5 py-3 rounded-2xl bg-[#1A2C32] border-2 border-[#37464F] text-white font-extrabold text-base shadow-md hover:border-[#1CB0F6] hover:bg-[#233A42] active:scale-95 transition-all"
             >
               {word}
             </button>

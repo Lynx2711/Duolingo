@@ -76,8 +76,8 @@ function flattenNodes(unit: UnitData): NodeItem[] {
       skill.lesson_ids && skill.lesson_ids.length > 0
         ? skill.lesson_ids
         : skill.next_lesson_id
-        ? [skill.next_lesson_id]
-        : [skill.id];
+          ? [skill.next_lesson_id]
+          : [skill.id];
 
     ids.forEach((lid, i) => {
       const isCompleted = skill.level >= 1 || skill.completed_lessons > i;
@@ -99,11 +99,11 @@ function flattenNodes(unit: UnitData): NodeItem[] {
 }
 
 // Layout constants
-const NODE_R   = NODE_DIAMETER / 2; // 36px
-const ROW_H    = 100;               // 72px node + 28px vertical gap = 100px
+const NODE_R = NODE_DIAMETER / 2; // 36px
+const ROW_H = 100;               // 72px node + 28px vertical gap = 100px
 const CANVAS_W = 480;
-const PAD_TOP  = 60;
-const OFFSETS  = [0, 55, 80, 55, 0, -55, -80, -55];
+const PAD_TOP = 60;
+const OFFSETS = [0, 55, 80, 55, 0, -55, -80, -55];
 
 function colX(idx: number) {
   return CANVAS_W / 2 + OFFSETS[idx % OFFSETS.length];
@@ -111,9 +111,9 @@ function colX(idx: number) {
 
 export default function PathPage() {
   const [coursePath, setCoursePath] = useState<CoursePathData | null>(null);
-  const [user, setUser]             = useState<UserData | null>(null);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
+  const [user, setUser] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const fetchData = async () => {
@@ -142,21 +142,31 @@ export default function PathPage() {
       className="min-h-screen flex flex-col"
       style={{ background: "var(--background)", color: "var(--text-primary)" }}
     >
-      {/* Top bar */}
       <TopBar user={user} onUserUpdate={fetchData} />
 
-      {/* Main body: left sidebar | centre path | right panel */}
-      <div className="flex flex-1">
+      {/* 3-Column Body: [Left Sidebar] [Center flex-1] [Right 368px lg-only] */}
+      <div className="flex flex-1 w-full">
+
+        {/* Left Sidebar (fixed, full-height) */}
         <Sidebar activeKey="learn" />
 
-        {/* Centre column — scrollable path */}
+        {/* Center Column */}
+        {/* ml offsets match sidebar widths: 88px collapsed, 256px expanded */}
         <main
-          className="flex-1 md:ml-20 xl:ml-[240px] flex justify-center overflow-y-auto px-4 py-8"
+          className={[
+            "flex-1",
+            "ml-[88px] lg:ml-[256px]",
+            "flex justify-center",
+            "overflow-y-auto",
+            "px-3 sm:px-4 md:px-6",
+            "pt-4 pb-10",
+          ].join(" ")}
           onClick={(e) => {
             if (e.target === e.currentTarget) setSelectedId(null);
           }}
         >
-          <div className="w-full max-w-[500px] flex flex-col items-stretch">
+          {/* Inner canvas: max 704px, centered */}
+          <div className="w-full max-w-[704px] mx-auto flex flex-col items-stretch">
             {loading && (
               <div className="flex flex-col items-center justify-center py-32 gap-4">
                 <img
@@ -184,8 +194,8 @@ export default function PathPage() {
             )}
 
             {!loading && !error && coursePath && coursePath.units.map((unit) => {
-              const nodes   = flattenNodes(unit);
-              const n       = nodes.length;
+              const nodes = flattenNodes(unit);
+              const n = nodes.length;
               const canvasH = PAD_TOP + n * ROW_H + 40;
 
               const positions = nodes.map((_, i) => ({
@@ -268,10 +278,13 @@ export default function PathPage() {
           </div>
         </main>
 
-        {/* Right widget panel */}
-        <div className="hidden lg:flex flex-col w-[340px] shrink-0 px-6 py-8 overflow-y-auto">
-          <RightSidebar user={user} />
+        {/* Right Sidebar: hidden < lg, 368px at lg+ */}
+        <div className="hidden lg:block w-[368px] shrink-0">
+          <div className="sticky top-14 overflow-y-auto max-h-[calc(100vh-3.5rem)] py-6 px-4">
+            <RightSidebar user={user} />
+          </div>
         </div>
+
       </div>
     </div>
   );
