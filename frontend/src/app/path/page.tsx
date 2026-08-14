@@ -146,7 +146,7 @@ export default function PathPage() {
       className="min-h-screen flex flex-col"
       style={{ background: "var(--background)", color: "var(--text-primary)" }}
     >
-      <TopBar user={user} onUserUpdate={fetchData} />
+      <TopBar user={user} onUserUpdate={() => fetchData(10)} />
 
       {/* 3-Column Body: [Left Sidebar] [Center flex-1] [Right 368px lg-only] */}
       <div className="flex flex-1 w-full">
@@ -182,7 +182,7 @@ export default function PathPage() {
                 <p className="text-[#FF4B4B] font-black mb-2">Unable to load path</p>
                 <p className="text-xs text-[#8A9BA3] mb-4">{error}</p>
                 <button
-                  onClick={fetchData}
+                  onClick={() => fetchData(10)}
                   className="px-5 py-2 rounded-xl bg-[#58CC02] text-white font-black text-sm"
                 >
                   Retry
