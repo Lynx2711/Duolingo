@@ -1,47 +1,60 @@
-# Import Column, Integer, String, Date, DateTime from sqlalchemy to define model fields
+# ==============================================================================
+# DATABASE ORM MODEL FOR APPLICATION USERS (models/user.py)
+# ==============================================================================
+# HINDI CONCEPT (समझने के लिए):
+# User Model Duolingo app ke Gamification stats ko track karta hai:
+# - XP (Experience Points)
+# - Streak (Lagatar kitne din se app use kar raha hai)
+# - Hearts (Zindagi/Lives - Max 5)
+# - Gems (Virtual currency)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# INBUILT VS CUSTOM IMPORTS EXPLANATION:
+# ------------------------------------------------------------------------------
+# 1. Column, Integer, String, Date, DateTime (SQLAlchemy Inbuilt Data Types):
+#    SQL Data Types represent karta hai.
+# 2. func (SQLAlchemy Inbuilt SQL Function Helper):
+#    `func.now()` SQLite database engine se current timestamp get karta hai.
+# 3. relationship (SQLAlchemy Inbuilt): ORM Relationship mapping.
+# 4. Base (Custom Core Import): Inherited SQLAlchemy Base class.
+# ------------------------------------------------------------------------------
 from sqlalchemy import Column, Integer, String, Date, DateTime
-# Import func from sqlalchemy.sql to use SQL functions like now()
 from sqlalchemy.sql import func
-# Import relationship from sqlalchemy.orm to define relationships between tables
 from sqlalchemy.orm import relationship
-# Import Base from core.database to inherit from the declarative base
 from core.database import Base
 
-# Define the User model which represents application users
+# ==============================================================================
+# USER MODEL (`users` table in Database)
+# ==============================================================================
 class User(Base):
-    # Set the table name in the database
     __tablename__ = 'users'
 
-    # Define the primary key column (id), auto-incremented integer, indexed for fast lookups
+    # Primary Key Column with Indexing for fast SQL queries
     id = Column(Integer, primary_key=True, index=True)
-    # Define the name column, string up to 100 chars, required
+    # User Profile Info
     name = Column(String(100), nullable=False)
-    # Define the email column, string up to 255 chars, must be unique, required
     email = Column(String(255), unique=True, nullable=False)
-    # Define the avatar_url column for profile pictures, string up to 500 chars, optional
     avatar_url = Column(String(500), nullable=True)
-    # Define xp_total to track lifetime XP, default is 0
-    xp_total = Column(Integer, default=0)
-    # Define streak to track consecutive days of activity, default is 0
-    streak = Column(Integer, default=0)
-    # Define hearts to track current health in the game, default is 5
-    hearts = Column(Integer, default=5)
-    # Define max_hearts to cap the maximum health, default is 5
-    max_hearts = Column(Integer, default=5)
-    # Define gems to track virtual currency, default is 500
-    gems = Column(Integer, default=500)
-    # Define last_active_date to calculate daily streaks, optional
-    last_active_date = Column(Date, nullable=True)
-    # Define daily_goal_xp to set user's XP target, default is 20
-    daily_goal_xp = Column(Integer, default=20)
-    # Define created_at to track account creation time, defaults to current server time
+    
+    # Gamification Counters:
+    xp_total = Column(Integer, default=0)         # Lifetime total XP earned
+    streak = Column(Integer, default=0)           # Consecutive active days count
+    hearts = Column(Integer, default=5)           # Current remaining hearts (0-5)
+    max_hearts = Column(Integer, default=5)       # Max hearts cap (5)
+    gems = Column(Integer, default=500)           # Virtual currency balance
+    last_active_date = Column(Date, nullable=True)# Date of last completed lesson (for streak calculation)
+    daily_goal_xp = Column(Integer, default=20)   # User's daily target XP
+    
+    # Inbuilt SQL Function (`func.now()`): Automatic timestamp when row is created
     created_at = Column(DateTime, server_default=func.now())
 
-    # Define relationship to UserCourseEnrollment, enabling cascading deletes
+    # --------------------------------------------------------------------------
+    # ORM RELATIONSHIPS:
+    # --------------------------------------------------------------------------
+    # Links to user's enrollments, progress, lesson attempts, and achievements.
     enrollments = relationship('UserCourseEnrollment', back_populates='user', cascade='all, delete-orphan', passive_deletes=True)
-    # Define relationship to UserSkillProgress, enabling cascading deletes
     skill_progress = relationship('UserSkillProgress', back_populates='user', cascade='all, delete-orphan', passive_deletes=True)
-    # Define relationship to UserLessonAttempt, enabling cascading deletes
     lesson_attempts = relationship('UserLessonAttempt', back_populates='user', cascade='all, delete-orphan', passive_deletes=True)
-    # Define relationship to UserAchievement, enabling cascading deletes
     achievements = relationship('UserAchievement', back_populates='user', cascade='all, delete-orphan', passive_deletes=True)
+

@@ -1,87 +1,87 @@
-# Import APIRouter, Depends, and HTTPException from fastapi for routing, DI, and error handling
+# ==============================================================================
+# USER MANAGEMENT & HEARTS REFILL ENDPOINTS (api/routes/users.py)
+# ==============================================================================
+# Yahan User profile management aur Shop feature (Hearts Refill using Gems) chalta hai.
+# Endpoints:
+# 1. GET /api/users/{user_id} -> User stats (XP, Hearts, Gems, Streak)
+# 2. PATCH /api/users/{user_id} -> Profile Edit (Partial Update)
+# 3. POST /api/users/{user_id}/refill-hearts -> 100 Gems kat ke 5 Hearts restore!
+
+# 1. APIRouter, Depends, HTTPException (FastAPI Built-in Tools): Framework helpers.
+# 2. Session (SQLAlchemy Built-in): Database session type.
+# 3. get_db (Custom Core Dependency): DB session provider.
+# ------------------------------------------------------------------------------
 from fastapi import APIRouter, Depends, HTTPException
-# Import Session from sqlalchemy.orm for database session type hinting
 from sqlalchemy.orm import Session
-# Import get_db to inject database sessions into our routes
-from core.database import get_db
-# Import User model to interact with the users table in the database
-from models.user import User
-# Import Pydantic schemas for data validation and serialization
-from schemas.user import UserResponse, UserUpdate
-# Import Any for generic type hinting where needed
 from typing import Any
 
-# Create a router instance with a prefix and tags for Swagger UI grouping
+from core.database import get_db
+from models.user import User
+from schemas.user import UserResponse, UserUpdate
+
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
-# Define a GET endpoint to fetch a user by ID
+#==============================================================================
+# GET /api/users/{user_id} - Fetch User Stats
+#==============================================================================
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(user_id: int, db: Session = Depends(get_db)) -> UserResponse:
-    # Query the database for a user matching the provided ID
     user = db.query(User).filter(User.id == user_id).first()
-    # Check if the user exists in the database
     if not user:
-        # If no user is found, raise a 404 HTTP exception to inform the client
         raise HTTPException(status_code=404, detail="User not found")
-    # Return the user object, which FastAPI will serialize using UserResponse
     return user
 
-# Define a PATCH endpoint to update user details partially
+# ==============================================================================
+# PATCH /api/users/{user_id} - Dynamic Profile Update
+# ==============================================================================
+# Partial Update using Pydantic `model_dump(exclude_unset=True)`
+# Jab frontend se sirf name change ho, toh `exclude_unset=True` ensures karta hai ki 
+# baaki fields (gems, xp) touch na hon.
+# ==============================================================================
 @router.patch("/{user_id}", response_model=UserResponse)
 def update_user(user_id: int, user_update: UserUpdate, db: Session = Depends(get_db)) -> UserResponse:
-    # Query the database for the specified user
     user = db.query(User).filter(User.id == user_id).first()
-    # If the user does not exist, raise a 404 error
     if not user:
-        # Raise HTTP 404 to indicate the requested resource is missing
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Convert the Pydantic update model to a dictionary, ignoring unset fields to allow partial updates
+    # Inbuilt Pydantic V2 Method: `model_dump(exclude_unset=True)`
+    # Sirf wahi dictionary keys filter karta hai jo JSON body me submit ki gayi hain.
     update_data = user_update.model_dump(exclude_unset=True)
     
-    # Iterate over the provided fields in the update data
     for key, value in update_data.items():
-        # Use setattr to dynamically update the user object's attributes
+        # Inbuilt Python Function: `setattr` object field update karta hai
         setattr(user, key, value)
         
-    # Commit the transaction to save changes to the database
     db.commit()
-    # Refresh the user instance to get the latest state from the database
     db.refresh(user)
-    # Return the updated user
     return user
 
-# Define a POST endpoint for users to refill their hearts using gems
+# ==============================================================================
+# POST /api/users/{user_id}/refill-hearts - Shop Hearts Refill
+# ==============================================================================
+# HINDI CONCEPT: Gems to Hearts Exchange Transaction
+# Cost: 100 Gems
+# Action: Deducts 100 gems & resets hearts = max_hearts (5).
+# Validation: Returns 400 Bad Request if gems < 100 or hearts are already full.
+# ==============================================================================
 @router.post("/{user_id}/refill-hearts", response_model=UserResponse)
 def refill_hearts(user_id: int, db: Session = Depends(get_db)) -> UserResponse:
-    # Query the database to find the user
     user = db.query(User).filter(User.id == user_id).first()
-    # If the user doesn't exist, raise 404
     if not user:
-        # HTTP 404 since the user ID is invalid
         raise HTTPException(status_code=404, detail="User not found")
         
-    # Define the cost to refill hearts (100 gems)
     refill_cost: int = 100
     
-    # Check if the user has enough gems to pay for the refill
     if user.gems < refill_cost:
-        # If not enough gems, raise a 400 Bad Request exception
         raise HTTPException(status_code=400, detail="Not enough gems")
         
-    # Check if hearts are already full, so we don't waste the user's gems
     if user.hearts >= user.max_hearts:
-        # Raise 400 because the action is unnecessary
         raise HTTPException(status_code=400, detail="Hearts are already full")
         
-    # Deduct the cost from the user's gems
     user.gems -= refill_cost
-    # Set the user's hearts to their maximum capacity
     user.hearts = user.max_hearts
     
-    # Commit the transaction to persist the changes
     db.commit()
-    # Refresh the user object from the DB
     db.refresh(user)
-    # Return the updated user object
     return user
+

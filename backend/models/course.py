@@ -1,73 +1,86 @@
-# Import necessary Column types and ForeignKey for relational mapping
+# ==============================================================================
+# DATABASE ORM MODELS FOR COURSES, UNITS & SKILLS (models/course.py)
+# ==============================================================================
+# HINDI CONCEPT (समझने के लिए):
+# SQLAlchemy Models Python Classes hain jo SQLite Database Tables ka "Blueprint / Khaka" hain.
+# Multi-level Structure:
+# Course (e.g. Spanish) -> Units (e.g. Basics, Travel) -> Skills (e.g. Greetings, Food)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# INBUILT VS CUSTOM IMPORTS EXPLANATION:
+# ------------------------------------------------------------------------------
+# 1. Column, Integer, String, ForeignKey (SQLAlchemy Inbuilt Data Types):
+#    SQL Database ke Datatypes ko specify karte hain.
+# 2. relationship (SQLAlchemy Inbuilt ORM Link):
+#    Database ke Tables ke beech parent-child rishta (One-to-Many / Many-to-One) banata hai.
+# 3. Base (Custom Core Import):
+#    `core.database` me bani Base class jisse har ORM model inherit karta hai.
+# ------------------------------------------------------------------------------
 from sqlalchemy import Column, Integer, String, ForeignKey
-# Import relationship to establish links between models
 from sqlalchemy.orm import relationship
-# Import Base to inherit standard metadata and table naming config
 from core.database import Base
 
-# Define the Course model representing a language course (e.g., Spanish)
+# ==============================================================================
+# COURSE MODEL (`courses` table in Database)
+# ==============================================================================
 class Course(Base):
-    # Set the table name
     __tablename__ = 'courses'
 
-    # Primary key for the course
+    # Primary Key Column (Inbuilt SQLAlchemy Column):
     id = Column(Integer, primary_key=True)
-    # Name of the course, required
+    # Course Name (e.g., 'Spanish')
     name = Column(String(100), nullable=False)
-    # Language code (e.g., 'es' for Spanish), required
+    # Language Code (e.g., 'es')
     language_code = Column(String(10), nullable=False)
-    # URL for the course icon/flag, optional
+    # Icon Image URL
     icon_url = Column(String(500), nullable=True)
     
-    # Relationship to Unit model, deletes units if course is deleted
+    # --------------------------------------------------------------------------
+    # ORM RELATIONSHIPS (Python-level links, NOT physical DB columns):
+    # --------------------------------------------------------------------------
+    # - `units`: Iss Course ke saare Units ki list (e.g. course.units).
+    # - `cascade='all, delete-orphan'`: Agar course delete hoga toh saare units bhi automatically delete ho jayenge.
     units = relationship('Unit', back_populates='course', cascade='all, delete-orphan', passive_deletes=True)
-    # Relationship to user enrollments, deletes enrollments if course is deleted
     enrollments = relationship('UserCourseEnrollment', back_populates='course', cascade='all, delete-orphan', passive_deletes=True)
 
-# Define the Unit model representing a section within a course
+# ==============================================================================
+# UNIT MODEL (`units` table in Database)
+# ==============================================================================
 class Unit(Base):
-    # Set the table name
     __tablename__ = 'units'
 
-    # Primary key for the unit
     id = Column(Integer, primary_key=True)
-    # Foreign key linking to the course, uses CASCADE on delete at DB level
+    # Foreign Key (Physical DB Column linking to courses.id):
     course_id = Column(Integer, ForeignKey('courses.id', ondelete='CASCADE'), nullable=False)
-    # Display order within the course, required
+    # Unit Sequence Order (1, 2, 3...)
     order = Column(Integer, nullable=False)
-    # Title of the unit (e.g., 'Basics'), required
+    # Unit Title (e.g., 'Basics')
     title = Column(String(100), nullable=False)
-    # Description of the unit, optional
     description = Column(String(500), nullable=True)
-    # Hex color for UI theming, required with a default green color
+    # UI Color Theme Hex Code
     color = Column(String(7), nullable=False, default='#58CC02')
     
-    # Relationship back to the parent course
+    # Relationships:
     course = relationship('Course', back_populates='units')
-    # Relationship to Skill model, deletes skills if unit is deleted
     skills = relationship('Skill', back_populates='unit', cascade='all, delete-orphan', passive_deletes=True)
 
-# Define the Skill model representing a topic/skill within a unit
+# ==============================================================================
+# SKILL MODEL (`skills` table in Database)
+# ==============================================================================
 class Skill(Base):
-    # Set the table name
     __tablename__ = 'skills'
 
-    # Primary key for the skill
     id = Column(Integer, primary_key=True)
-    # Foreign key linking to the unit, uses CASCADE on delete
     unit_id = Column(Integer, ForeignKey('units.id', ondelete='CASCADE'), nullable=False)
-    # Display order within the unit, required
     order = Column(Integer, nullable=False)
-    # Name of the skill (e.g., 'Greetings'), required
+    # Skill Name (e.g., 'Greetings')
     name = Column(String(100), nullable=False)
-    # URL for the skill icon, optional
     icon_url = Column(String(500), nullable=True)
-    # Hex color for UI theming, required
     color = Column(String(7), nullable=False)
     
-    # Relationship back to the parent unit
+    # Relationships:
     unit = relationship('Unit', back_populates='skills')
-    # Relationship to Lesson model, deletes lessons if skill is deleted
     lessons = relationship('Lesson', back_populates='skill', cascade='all, delete-orphan', passive_deletes=True)
-    # Relationship to user progress, deletes progress if skill is deleted
     user_progress = relationship('UserSkillProgress', back_populates='skill', cascade='all, delete-orphan', passive_deletes=True)
+

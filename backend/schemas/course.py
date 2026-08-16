@@ -1,88 +1,87 @@
-# Import BaseModel and ConfigDict for defining schemas
+# ==============================================================================
+# PYDANTIC SCHEMAS FOR COURSES, UNITS & LEARNING PATH (schemas/course.py)
+# ==============================================================================
+# HINDI CONCEPT (समझने के लिए):
+# Pydantic Schemas humare API ka "Data Security Guard & Packing Box" hain.
+# 1. Incoming Request Data ko validate karte hain (Type check: int, str, bool).
+# 2. Outgoing JSON Data ko shape aur structure dete hain jo frontend expect karta hai.
+# SQLAlchemy Models = DB Tables
+# Pydantic Schemas = API JSON Payloads
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# INBUILT VS CUSTOM IMPORTS EXPLANATION:
+# ------------------------------------------------------------------------------
+# 1. BaseModel (Inbuilt Pydantic Class): Subhi Pydantic data schemas is class se inherit karte hain.
+# 2. ConfigDict (Inbuilt Pydantic Setting): Schema behavior configuration.
+#    `from_attributes=True`: Allow करता hai ki SQLAlchemy ORM objects (e.g. db_course) 
+#    ko direct Pydantic JSON response me convert kiya ja sake.
+# 3. Optional, List (Python typing standard library): Type annotations for nullable fields & arrays.
+# ------------------------------------------------------------------------------
 from pydantic import BaseModel, ConfigDict
-# Import Optional and List for type hints
 from typing import Optional, List
 
-# Define base schema for Course containing common fields
+# ==============================================================================
+# COURSE SCHEMAS
+# ==============================================================================
 class CourseBase(BaseModel):
-    # Course name (e.g., 'Spanish'), required
-    name: str
-    # Language code (e.g., 'es'), required
-    language_code: str
+    name: str           # e.g. "Spanish"
+    language_code: str  # e.g. "es"
 
-# Define response schema for Course, adds DB fields
 class CourseResponse(CourseBase):
-    # Course ID
     id: int
-    # Optional course icon URL
     icon_url: Optional[str] = None
 
-    # Enable reading from ORM attributes
+    # Inbuilt Pydantic Config: Allows converting SQLAlchemy ORM model directly to JSON schema
     model_config = ConfigDict(from_attributes=True)
 
-# Define base schema for Unit
+# ==============================================================================
+# UNIT SCHEMAS
+# ==============================================================================
 class UnitBase(BaseModel):
-    # Unit title (e.g., 'Basics'), required
-    title: str
-    # Display order, required
-    order: int
-    # UI color hex code, required
-    color: str
+    title: str          # e.g. "Basics"
+    order: int          # Display order (1, 2...)
+    color: str          # UI Color Hex string "#58CC02"
 
-# Define response schema for Unit
 class UnitResponse(UnitBase):
-    # Unit ID
     id: int
-    # Associated Course ID
     course_id: int
-    # Optional description
     description: Optional[str] = None
 
-    # Enable reading from ORM attributes
     model_config = ConfigDict(from_attributes=True)
 
-# Define base schema for Skill
+# ==============================================================================
+# SKILL SCHEMAS
+# ==============================================================================
 class SkillBase(BaseModel):
-    # Skill name (e.g., 'Greetings'), required
-    name: str
-    # Display order, required
+    name: str           # e.g. "Greetings"
     order: int
-    # UI color hex code, required
     color: str
 
-# Define response schema for Skill
 class SkillResponse(SkillBase):
-    # Skill ID
     id: int
-    # Associated Unit ID
     unit_id: int
-    # Optional icon URL
     icon_url: Optional[str] = None
 
-    # Enable reading from ORM attributes
     model_config = ConfigDict(from_attributes=True)
 
-# Define schema for Skill that includes user progress data
+# ==============================================================================
+# COMPLEX NESTED SCHEMAS (For Duolingo Learning Path Screen)
+# ==============================================================================
+# HINDI CONCEPT: Learning Path Node Payload
+# Next.js `/path` screen me har skill node ke sath uski locking status (is_locked)
+# aur next lesson ID render honi hoti hai.
 class SkillWithProgress(SkillResponse):
-    # Current crown level, defaults to 0
     level: int = 0
-    # Lessons completed at current level, defaults to 0
     completed_lessons: int = 0
-    # Total lessons in current level, defaults to 2
     total_lessons: int = 2
-    # Boolean indicating if skill is locked based on prerequisites, defaults to True
     is_locked: bool = True
-    # The ID of the next uncompleted lesson in this skill (or first lesson if completed) for starting lessons
     next_lesson_id: Optional[int] = None
-    # Ordered list of all lesson IDs for this skill — one path node is rendered per lesson
     lesson_ids: List[int] = []
 
-# Define schema for Unit containing nested skills with progress
 class UnitWithSkills(UnitResponse):
-    # List of associated skills with progress data
     skills: List[SkillWithProgress]
 
-# Define schema for Course containing nested units
 class CourseWithUnits(CourseResponse):
-    # List of associated units
     units: List[UnitWithSkills]
+

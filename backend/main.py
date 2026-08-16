@@ -1,99 +1,147 @@
+# ==============================================================================
+# MAIN APPLICATION ENTRY POINT (main.py)
+# ==============================================================================
+# HINDI CONCEPT (समझने के लिए):
+# main.py humare poore backend application ki "Main Building / Reception Desk" hai.
+# Jab bhi frontend (Next.js) ya user koi request bhejta hai, sabse pehle vo request
+# yahan main.py me aati hai. Yahan se security check (CORS) hota hai aur phir request
+# right department (Router) ke paas bhej di jaati hai.
+# ==============================================================================
+
 import sys
 import os
 
-# Ensure backend directory is in sys.path so modules like core, models, schemas, api can be imported reliably
+# Python Path Setup (Custom Code):
+# System ko batate hain ki backend folder humari root directory hai, 
+# taaki `import core...` ya `import models...` karte waqt "ModuleNotFound" error na aaye.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Import FastAPI and its lifecycle tools
+# ------------------------------------------------------------------------------
+# INBUILT VS CUSTOM IMPORTS EXPLANATION:
+# ------------------------------------------------------------------------------
+# 1. FastAPI (Inbuilt Class): FastAPI framework ki main application class.
+# 2. CORSMiddleware (Inbuilt Middleware): Cross-Origin Resource Sharing security ke liye built-in tool.
+# 3. asynccontextmanager (Python Standard Library): Asynchronous lifecycle events manage karne ke liye decorator.
+# 4. uvicorn (Inbuilt/External Server): ASGI Web Server jo Python backend ko live HTTP port par chalata hai.
+# ------------------------------------------------------------------------------
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-# Import contextlib for lifespan event handling
 from contextlib import asynccontextmanager
 import uvicorn
 
-# Import core configurations and database setups
-from core.config import settings
-from core.database import engine, Base, SessionLocal
+# Custom App Imports (Humare dwara banaye gaye modules):
+from core.config import settings           # Settings & environment variables
+from core.database import engine, Base, SessionLocal  # Database connection tools
+from api.routes import health, users, courses, lessons, progress, leaderboard, profile  # API Route Modules
+from seed import seed_database             # Initial fake/default data fill karne ka script
 
-# Import routers for the API endpoints
-from api.routes import health, users, courses, lessons, progress, leaderboard, profile
-
-# Import the seed script to optionally populate the DB on startup
-from seed import seed_database
-
-# Define the lifespan manager to execute startup and shutdown tasks
+# ==============================================================================
+# LIFESPAN CONTEXT MANAGER (Inbuilt FastAPI Lifecycle Pattern)
+# ==============================================================================
+# HINDI CONCEPT: "Dukaan kholne aur band karne ki ceremony"
+# `lifespan` function server start hone par (Startup) aur band hone par (Shutdown)
+# automatically chalta hai.
+# ==============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # STARTUP: Create all tables defined in SQLAlchemy models if they don't exist
+    # --------------------------------------------------------------------------
+    # STARTUP LOGIC (Server shuru hote hi chalega):
+    # --------------------------------------------------------------------------
+    # 1. Database Tables Creation (SQLAlchemy Inbuilt Method):
+    # Base.metadata.create_all DB me check karta hai, agar tables (users, lessons etc.)
+    # nahi bani hain toh SQLite database file (`duolingo.db`) me create kar deta hai.
     Base.metadata.create_all(bind=engine)
     
-    # STARTUP: Open a DB session to check if seeding is needed
+    # 2. Database Connection Check & Initial Seeding (Custom Logic):
+    # Data Kahan Se Aata Hai: Database (`duolingo.db`) se query karke check karte hain
+    # ki data exist karta hai ya nahi.
     db = SessionLocal()
     try:
-        # Import User locally to avoid circular imports if needed, though safe here
         from models.user import User
-        from models.lesson import Exercise
-        import re
-        # Check if the database is empty (no users exist)
+        # Agar Database me koi User nahi hai (Empty DB), toh default course & lessons add karo (Seed).
         if not db.query(User).first():
-            # If empty, run the seed script to populate default courses and users
             seed_database(db)
-        else:
-            # Normalize existing database exercise answers (strip trailing periods/punctuation)
-            for ex in db.query(Exercise).filter(Exercise.correct_answer != None).all():
-                if ex.correct_answer:
-                    cleaned = ex.correct_answer.rstrip('.!?, ')
-                    if cleaned != ex.correct_answer:
-                        ex.correct_answer = cleaned
-            db.commit()
     finally:
-        # Close the DB session to prevent memory leaks
+        # DB Session close karna zaroori hai memory leaks bachane ke liye.
         db.close()
         
-    # Yield control back to FastAPI to serve requests
+    # `yield` tak ka code STARTUP par chalta hai.
+    # Server chal raha hota hai tab control FastAPI ko handover ho jata hai.
     yield
-    # SHUTDOWN: (Nothing required here for now)
+    
+    # --------------------------------------------------------------------------
+    # SHUTDOWN LOGIC (Server stop hone par chalega):
+    # --------------------------------------------------------------------------
+    # Agar server band hote waqt koi cleanup karna ho (jaise Redis connection close), 
+    # toh wo yahan likha jata hai.
     pass
 
-# Initialize the FastAPI application with metadata and lifespan
+# ==============================================================================
+# FASTAPI APPLICATION INSTANTIATION (Built-in FastAPI Initialization)
+# ==============================================================================
+# FastAPI object create kar rahe hain jisme saari configurations pass kar rahe hain.
+# FastAPI automatically `/docs` route par interactive Swagger UI documentation banata hai.
 app = FastAPI(
-    title=settings.APP_NAME, # Application title from settings
-    description="Backend API for Duolingo Clone", # Short description
-    version="1.0.0", # API version
-    lifespan=lifespan, # Attach the lifespan context manager for startup tasks
-    docs_url="/docs", # Explicit Swagger UI route
-    redoc_url="/redoc" # Explicit ReDoc route
+    title=settings.APP_NAME,                   # Application Name from config
+    description="Backend API for Duolingo Clone", # API description
+    version="1.0.0",                           # Version number
+    lifespan=lifespan,                         # Startup/Shutdown lifecycle link
+    docs_url="/docs",                         # Automatic Swagger API Docs URL
+    redoc_url="/redoc"                        # Alternative ReDoc Documentation URL
 )
 
-# Configure Cross-Origin Resource Sharing (CORS) — securely whitelist Vercel production & preview domains
+# ==============================================================================
+# CORS MIDDLEWARE CONFIGURATION (Built-in FastAPI Security Tool)
+# ==============================================================================
+# HINDI CONCEPT: "Security Guard / Gatekeeper"
+# Browsers dusri domain (jaise localhost:3000 ya Vercel) se API request ko block karte hain.
+# CORSMiddleware in domains ko white-list karta hai taaki frontend safely data fetch kar sake.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://duolingo-dun.vercel.app",
-        "http://localhost:3000",
-        "http://localhost:8000",
+        "https://duolingo-dun.vercel.app",  # Production Vercel Frontend
+        "http://localhost:3000",             # Local Next.js Frontend
+        "http://localhost:8000",             # Local Backend Docs/Self
     ],
-    allow_origin_regex=r"https://.*\.vercel\.app", # Safely allow all Vercel deployment URLs
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Flexible matching for all Vercel previews
+    allow_credentials=True,                         # Allow cookies & authorization headers
+    allow_methods=["*"],                             # Allow all HTTP methods (GET, POST, PUT, DELETE)
+    allow_headers=["*"],                             # Allow all request headers
 )
 
-# Include all the API routers to register their endpoints
-app.include_router(health.router) # Health check
-app.include_router(users.router) # User management
-app.include_router(courses.router) # Course navigation and paths
-app.include_router(lessons.router) # Lesson taking and checking
-app.include_router(progress.router) # Skill progress tracking
-app.include_router(leaderboard.router) # Global leaderboard
-app.include_router(profile.router) # User profiles
+# ==============================================================================
+# ROUTER REGISTRATION (FastAPI Inbuilt Modular Routing)
+# ==============================================================================
+# HINDI CONCEPT: "Departments in an Office"
+# Humne pure API ko alag-alag modules (routes) me divide kiya hai:
+# - health: Server Status check (/health)
+# - users: User details & hearts refill (/api/users)
+# - courses: Courses, Units & Learning Paths (/api/courses)
+# - lessons: Exercise checking & XP calculations (/api/lessons)
+# - progress: User skill progress tracking (/api/progress)
+# - leaderboard: Top users ranking (/api/leaderboard)
+# - profile: User profile stats (/api/profile)
+# ==============================================================================
+app.include_router(health.router)
+app.include_router(users.router)
+app.include_router(courses.router)
+app.include_router(lessons.router)
+app.include_router(progress.router)
+app.include_router(leaderboard.router)
+app.include_router(profile.router)
 
-# Root endpoint for browser checks
+# ==============================================================================
+# ROOT ENDPOINT (FastAPI Path Operation Decorator `@app.get`)
+# ==============================================================================
+# Simple test endpoint backend online check karne ke liye.
 @app.get("/")
 def root():
     return {"status": "ok", "app_name": settings.APP_NAME, "docs_url": "/docs"}
 
-# Ensure the server runs when executed directly
+# ==============================================================================
+# SERVER EXECUTION BLOCK (Uvicorn Runner)
+# ==============================================================================
+# Jab is file ko directly terminal se chalaya jaye (`python main.py`), 
+# tab Uvicorn server port 8000 par launch hota hai with auto-reloading enabled.
 if __name__ == "__main__":
-    # Start the uvicorn ASGI server with hot reloading enabled
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

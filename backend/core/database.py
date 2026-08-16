@@ -1,60 +1,88 @@
-# Import create_engine to establish a connection to the database
+# ==============================================================================
+# DATABASE CONNECTION & ORM BASE CONFIGURATION (core/database.py)
+# ==============================================================================
+# database.py humare Python backend aur SQLite Database (`duolingo.db`) ke beech 
+# Connection Bridge banata hai.
+# FastAPI me hum har HTTP request ke liye ek naya Database Session kholte hain, 
+# kaam khatam hote hi us connection ko safe tariqe se close kar dete hain.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# INBUILT VS CUSTOM IMPORTS EXPLANATION:
+# ------------------------------------------------------------------------------
+# 1. create_engine (SQLAlchemy Inbuilt): Database file se physical connection setup karta hai.
+# 2. MetaData (SQLAlchemy Inbuilt): Database constraints aur naming rules hold karta hai.
+# 3. declarative_base (SQLAlchemy Inbuilt ORM Base): Saare Database Models (User, Lesson) 
+#    is Base class se inherit karte hain taaki Python class = Database Table ban sake.
+# 4. sessionmaker (SQLAlchemy Inbuilt Factory): Har request ke liye naye Database Sessions (SessionLocal)
+#    create karne wali factory.
+# ------------------------------------------------------------------------------
 from sqlalchemy import create_engine
-# Import MetaData to hold database schemas and naming conventions
 from sqlalchemy import MetaData
-# Import declarative_base to create a base class for ORM models
 from sqlalchemy.orm import declarative_base
-# Import sessionmaker to create a factory for new database sessions
 from sqlalchemy.orm import sessionmaker
-# Import our application settings to access the DATABASE_URL
-from core.config import settings
-# Import Generator for type hinting the get_db function
 from typing import Generator
 
-# Define naming conventions to ensure consistent database constraint names for Alembic migrations
+# Custom Settings Import:
+from core.config import settings
+
+# ==============================================================================
+# DATABASE CONSTRAINT NAMING CONVENTIONS (SQLAlchemy Best Practice)
+# ==============================================================================
+# Alembic Database Migrations me Automatic Foreign Key / Primary Key naming issues 
+# se bachane ke liye standard naming rule.
 naming_convention = {
-    # Naming convention for indexes
     "ix": "ix_%(column_0_label)s",
-    # Naming convention for unique constraints
     "uq": "uq_%(table_name)s_%(column_0_name)s",
-    # Naming convention for check constraints
     "ck": "ck_%(table_name)s_%(constraint_name)s",
-    # Naming convention for foreign keys
     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-    # Naming convention for primary keys
     "pk": "pk_%(table_name)s"
 }
 
-# Create a MetaData instance with our custom naming conventions
+# Inbuilt MetaData Instance:
 metadata = MetaData(naming_convention=naming_convention)
 
-# Create the SQLAlchemy engine, passing the database URL
-# We set check_same_thread to False for SQLite because FastAPI handles requests in multiple threads
+# ==============================================================================
+# SQLALCHEMY ENGINE CREATION (Built-in SQLAlchemy Engine)
+# ==============================================================================
+# Data Kahan Se Aata Hai: `settings.DATABASE_URL` (i.e. 'sqlite:///./duolingo.db')
+# SQLite multithreading environment ke liye `check_same_thread: False` set karna zaroori hai.
 engine = create_engine(
-    # The database URL from our settings
     settings.DATABASE_URL, 
-    # Connection arguments specifically required for SQLite in a multi-threaded environment
     connect_args={'check_same_thread': False}
 )
 
-# Create a sessionmaker factory for creating new Session objects
-# autocommit=False ensures we manually control transactions for data integrity
-# autoflush=False prevents automatic flushing of pending changes before queries
-# bind=engine connects the sessions to our database engine
+# ==============================================================================
+# SESSION FACTORY (SessionLocal)
+# ==============================================================================
+# HINDI CONCEPT: "Session Generator Machine"
+# Jab bhi hume database se padhna ya likhna ho, hum `SessionLocal()` se naya session maangte hain.
+# - autocommit=False: Pure transaction ko manual `db.commit()` karne par hi save hone deta hai.
+# - autoflush=False: Queries se pehle automatic unsaved changes flush hone se rokta hai.
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Create the declarative base class for our models, using our custom metadata
+# ==============================================================================
+# DECLARATIVE BASE CLASS (Base)
+# ==============================================================================
+# Subhi ORM Models (User, Course, Skill, Lesson, Exercise) is `Base` class se 
+# inherit karenge (e.g. `class User(Base): ...`).
 Base = declarative_base(metadata=metadata)
 
-# Define a dependency function to provide a database session per request
+# ==============================================================================
+# FASTAPI DEPENDENCY FUNCTION (`get_db`)
+# ==============================================================================
+# HINDI CONCEPT: "Automatic Water Tap (नल)"
+# Har FastAPI route function (jaise check_answer, get_user) me hum `db: Session = Depends(get_db)`
+# likhte hain. 
+# 1. FastAPI request aate hi `get_db()` call karke ek fresh `db` session create karta hai.
+# 2. `yield db` ke dwara session route function ko deta hai.
+# 3. Route function ka kaam khatam hone par `finally:` block chalta hai aur `db.close()` 
+#    se connection safely close ho jata hai.
+# ==============================================================================
 def get_db() -> Generator:
-    # Create a new database session instance
-    db = SessionLocal()
-    # Use a try block to ensure the session is always closed
+    db = SessionLocal()  # Naya session khola
     try:
-        # Yield the session to the FastAPI route handler
-        yield db
-    # Use a finally block to execute cleanup code regardless of exceptions
+        yield db         # Route handler ko session pass kiya
     finally:
-        # Close the session to release database connections back to the pool
-        db.close()
+        db.close()       # Connection safely band kar diya
+

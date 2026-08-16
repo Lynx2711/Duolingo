@@ -1,17 +1,47 @@
-# Import BaseSettings to create a configuration class that reads from environment variables
+# ==============================================================================
+# APPLICATION CONFIGURATION SYSTEM (core/config.py)
+# ==============================================================================
+# HINDI CONCEPT (समझने के लिए):
+# config.py humare project ka "Control Panel / Settings Manager" hai.
+# Jab hum app ko local environment (localhost) ya production server (Render/Vercel)
+# par chalate hain, toh Configuration Variables (jaise Database ka Path, Secret Keys)
+# `.env` file se read hokar yahan load hote hain.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# INBUILT VS CUSTOM IMPORTS EXPLANATION:
+# ------------------------------------------------------------------------------
+# BaseSettings (Inbuilt Pydantic Settings Class):
+# Pydantic Settings library ka built-in class jo automatically system Environment 
+# Variables (ya `.env` file) se values read karke Python data types (str, list) 
+# me convert karta hai aur validation karta hai.
+# ------------------------------------------------------------------------------
 from pydantic_settings import BaseSettings
 
-# Define a Settings class to hold application configuration, inheriting from BaseSettings
+# ==============================================================================
+# SETTINGS MODEL CLASS (Custom Configuration Definition inheriting from BaseSettings)
+# ==============================================================================
 class Settings(BaseSettings):
-    # Set the default database connection string to a local SQLite database
+    # 1. DATABASE_URL (Default: local SQLite database file `duolingo.db`)
+    # Data Kahan Se Aata Hai: `.env` file me `DATABASE_URL` variable se,
+    # ya agar wo nahi mile toh default value `'sqlite:///./duolingo.db'` use hoti hai.
     DATABASE_URL: str = 'sqlite:///./duolingo.db'
-    # Define a list of allowed CORS origins, defaulting to the local React dev server
+    
+    # 2. CORS_ORIGINS (List of Allowed Allowed Frontend Domains)
     CORS_ORIGINS: list[str] = ['http://localhost:3000']
-    # Define the application name for use in API docs and logs
+    
+    # 3. APP_NAME (Application Title for Swagger API Docs)
     APP_NAME: str = 'Duolingo Clone API'
     
-    # Configure the model to load these settings from a .env file if it exists
+    # Pydantic Model Configuration (Inbuilt Setting):
+    # Pydantic ko batate hain ki agar root directory me `.env` file mile toh wahan se read kare.
     model_config = {'env_file': '.env'}
 
-# Create a global settings instance to be imported and used throughout the application
+# ==============================================================================
+# GLOBAL SINGLETON INSTANCE (Custom Instance Creation)
+# ==============================================================================
+# Instantiating `Settings()` class once.
+# Ab pure backend me jahan bhi settings chahiye, hum `from core.config import settings`
+# karke `settings.DATABASE_URL` ya `settings.APP_NAME` directly access kar sakte hain.
 settings = Settings()
+

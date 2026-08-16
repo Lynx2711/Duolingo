@@ -1,102 +1,98 @@
-# Import Column types, ForeignKey, UniqueConstraint, and Boolean
+# ==============================================================================
+# DATABASE ORM MODELS FOR PROGRESS & SECURITY ATTEMPTS (models/progress.py)
+# ==============================================================================
+# HINDI CONCEPT (समझने के लिए):
+# Is file me user ke saare Progress Records store hote hain:
+# 1. UserCourseEnrollment: User ne kaunsa course join kiya hai.
+# 2. UserSkillProgress: User ka ek Skill me kitna level aur kitne lessons complete huye hain.
+# 3. UserLessonAttempt: SECURITY SESSION! Server har lesson start hone par ek attempt ID
+#    create karta hai aur XP/Hearts server-side count karta hai taaki client cheat na kar sake.
+# 4. UserAchievement: User ke Badges (e.g. 7 day streak badge).
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# INBUILT VS CUSTOM IMPORTS EXPLANATION:
+# ------------------------------------------------------------------------------
+# 1. Column, Integer, String, ForeignKey, DateTime, Boolean (SQLAlchemy Inbuilt Data Types):
+# 2. UniqueConstraint (SQLAlchemy Inbuilt Constraint):
+#    Table level Rule jo guarantee karta hai ki (user_id, course_id) duplicate nahi hoga.
+# 3. func (SQLAlchemy Inbuilt Helper): For `server_default=func.now()`.
+# 4. Base (Custom Core Import): Inherited SQLAlchemy Base class.
+# ------------------------------------------------------------------------------
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, UniqueConstraint
-# Import func for database-side timestamp generation
 from sqlalchemy.sql import func
-# Import relationship to link models
 from sqlalchemy.orm import relationship
-# Import Base from core.database
 from core.database import Base
 
-# Define UserCourseEnrollment model to track which users are taking which courses
+# ==============================================================================
+# USER COURSE ENROLLMENT MODEL (`user_course_enrollments` table in Database)
+# ==============================================================================
 class UserCourseEnrollment(Base):
-    # Set the table name
     __tablename__ = 'user_course_enrollments'
 
-    # Primary key
     id = Column(Integer, primary_key=True)
-    # Foreign key to user, CASCADE delete
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    # Foreign key to course, CASCADE delete
     course_id = Column(Integer, ForeignKey('courses.id', ondelete='CASCADE'), nullable=False)
-    # Timestamp of enrollment, auto-set on creation
     enrolled_at = Column(DateTime, server_default=func.now())
     
-    # Ensure a user can only enroll in a specific course once
+    # Inbuilt SQLAlchemy Unique Constraint: Ek user ek hi course me 2 baar enroll nahi ho sakta.
     __table_args__ = (UniqueConstraint('user_id', 'course_id'),)
     
-    # Relationship back to User
     user = relationship('User', back_populates='enrollments')
-    # Relationship back to Course
     course = relationship('Course', back_populates='enrollments')
 
-# Define UserSkillProgress model to track progress within specific skills
+# ==============================================================================
+# USER SKILL PROGRESS MODEL (`user_skill_progress` table in Database)
+# ==============================================================================
 class UserSkillProgress(Base):
-    # Set the table name
     __tablename__ = 'user_skill_progress'
 
-    # Primary key
     id = Column(Integer, primary_key=True)
-    # Foreign key to user, CASCADE delete
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    # Foreign key to skill, CASCADE delete
     skill_id = Column(Integer, ForeignKey('skills.id', ondelete='CASCADE'), nullable=False)
-    # Current crown level (0 = not started), default 0
-    level = Column(Integer, default=0)
-    # Number of completed lessons in the current level, default 0
-    completed_lessons = Column(Integer, default=0)
-    # Total number of lessons in this skill level for calculating progress, default 2
-    total_lessons = Column(Integer, default=2)
-    # Timestamp when skill was fully completed, optional
-    completed_at = Column(DateTime, nullable=True)
+    level = Column(Integer, default=0)              # Current Skill Level / Crown Level (0 = locked/not started)
+    completed_lessons = Column(Integer, default=0) # Completed lessons count in this level
+    total_lessons = Column(Integer, default=2)     # Total lessons required to level up
+    completed_at = Column(DateTime, nullable=True)  # Timestamp when skill was 100% finished
     
-    # Ensure a user only has one progress record per skill
     __table_args__ = (UniqueConstraint('user_id', 'skill_id'),)
     
-    # Relationship back to User
     user = relationship('User', back_populates='skill_progress')
-    # Relationship back to Skill
     skill = relationship('Skill', back_populates='user_progress')
 
-# Define UserLessonAttempt model to record individual lesson sessions
+# ==============================================================================
+# USER LESSON ATTEMPT MODEL (`user_lesson_attempts` table in Database)
+# ==============================================================================
+# HINDI CONCEPT: "Security Ticket / Ledger Entry"
+# Jab user lesson shuru karta hai, `/start` route ek `attempt_id` generates karta hai.
+# Server is row me `xp_earned` (+10 per right answer) aur `hearts_lost` (+1 per wrong answer)
+# khud increment karta hai. Client in numbers ko modify nahi kar sakta!
+# ==============================================================================
 class UserLessonAttempt(Base):
-    # Set the table name
     __tablename__ = 'user_lesson_attempts'
 
-    # Primary key
     id = Column(Integer, primary_key=True)
-    # Foreign key to user, CASCADE delete
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    # Foreign key to lesson, CASCADE delete
     lesson_id = Column(Integer, ForeignKey('lessons.id', ondelete='CASCADE'), nullable=False)
-    # XP earned during this attempt, default 0
-    xp_earned = Column(Integer, default=0)
-    # Number of hearts lost during this attempt, default 0
-    hearts_lost = Column(Integer, default=0)
-    # Timestamp when lesson started, auto-set
+    xp_earned = Column(Integer, default=0)    # Server-accumulated XP
+    hearts_lost = Column(Integer, default=0)  # Server-accumulated hearts lost
     started_at = Column(DateTime, server_default=func.now())
-    # Timestamp when lesson finished, optional
-    completed_at = Column(DateTime, nullable=True)
-    # Boolean indicating if the user successfully passed the lesson
-    passed = Column(Boolean, default=False)
-    
-    # Relationship back to User
+    completed_at = Column(DateTime, nullable=True) # Set when `/complete` endpoint is called
+    passed = Column(Boolean, default=False)   # Set to True if hearts_lost < 5
+
     user = relationship('User', back_populates='lesson_attempts')
-    # Relationship back to Lesson
     lesson = relationship('Lesson', back_populates='attempts')
 
-# Define UserAchievement model to track badges/milestones earned by users
+# ==============================================================================
+# USER ACHIEVEMENT MODEL (`user_achievements` table in Database)
+# ==============================================================================
 class UserAchievement(Base):
-    # Set the table name
     __tablename__ = 'user_achievements'
 
-    # Primary key
     id = Column(Integer, primary_key=True)
-    # Foreign key to user, CASCADE delete
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    # String identifying the type of achievement (e.g., 'streak_3'), required
-    achievement_type = Column(String(100), nullable=False)
-    # Timestamp when achievement was earned, auto-set
+    achievement_type = Column(String(100), nullable=False)  # Badge identifier (e.g. 'wildfire_streak_7')
     achieved_at = Column(DateTime, server_default=func.now())
     
-    # Relationship back to User
     user = relationship('User', back_populates='achievements')
+

@@ -3,25 +3,47 @@
 // All lesson-related calls now follow the secure attempt_id pattern:
 // /start -> attempt_id -> /check-answer (with attempt_id) -> /complete (with attempt_id only)
 
-const API_BASE_URL: string =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://duolingo-backend-vrcj.onrender.com";
+const getApiBaseUrl = (): string => {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) return process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+    return "http://localhost:8000";
+  }
+  return "https://duolingo-backend-vrcj.onrender.com";
+};
 
 // Generic typed fetch wrapper with error handling
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const baseUrl = API_BASE_URL.replace(/\/+$/, "");
+  const baseUrl = getApiBaseUrl().replace(/\/+$/, "");
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const url = `${baseUrl}${cleanEndpoint}`;
   const response = await fetch(url, {
     ...options,
     headers: { "Content-Type": "application/json", ...options.headers },
   });
+
+  const text = await response.text();
+
   if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.detail || `API Error: ${response.status} ${response.statusText}`);
+    let errorDetail = `API Error: ${response.status} ${response.statusText}`;
+    if (text) {
+      try {
+        const errorData = JSON.parse(text);
+        if (errorData?.detail) errorDetail = errorData.detail;
+      } catch {}
+    }
+    throw new Error(errorDetail);
   }
-  return response.json() as Promise<T>;
+
+  if (!text || !text.trim()) {
+    return {} as T;
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Invalid JSON response from endpoint ${cleanEndpoint}`);
+  }
 }
 
 // ── User ─────────────────────────────────────────────────────────────────────

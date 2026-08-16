@@ -139,8 +139,10 @@ export default function LessonPage() {
         return selectedAnswer !== null;
       case "translate_word_bank":
         return wordBankSelected.length > 0;
-      case "match_pairs":
-        return matchedPairs.length > 0 && matchedPairs.length === (currentExercise.data.pairs as string[][]).length;
+      case "match_pairs": {
+        const totalPairs = (currentExercise.data?.pairs as string[][] | undefined)?.length ?? 0;
+        return totalPairs > 0 && matchedPairs.length === totalPairs;
+      }
       case "fill_blank":
         if ((currentExercise.data.options as string[] | undefined)?.length) {
           return selectedAnswer !== null;
@@ -153,6 +155,16 @@ export default function LessonPage() {
     }
   })();
 
+  // Helper to normalize and clean strings consistently across all exercises
+  const cleanAnswerString = (str: unknown): string => {
+    if (!str) return "";
+    return String(str)
+      .normalize("NFD")
+      .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, " ") // remove zero-width & non-breaking spaces
+      .replace(/\s+/g, " ")                         // collapse multiple spaces into single space
+      .trim();
+  };
+
   // Build answer payload
   const buildAnswerPayload = () => {
     if (!currentExercise || !attemptId) return null;
@@ -160,21 +172,29 @@ export default function LessonPage() {
 
     switch (currentExercise.type) {
       case "multiple_choice":
-        return { ...base, user_answer: selectedAnswer };
-      case "translate_word_bank":
-        return { ...base, user_answer: wordBankSelected.join(" ") };
-      case "match_pairs":
-        return { ...base, user_pairs: matchedPairs };
+        return { ...base, user_answer: cleanAnswerString(selectedAnswer) };
+      case "translate_word_bank": {
+        const joined = wordBankSelected
+          .map(w => cleanAnswerString(w))
+          .filter(w => w.length > 0)
+          .join(" ");
+        return { ...base, user_answer: joined };
+      }
+      case "match_pairs": {
+        const cleanedPairs = matchedPairs.map(p => [
+          cleanAnswerString(p[0]),
+          cleanAnswerString(p[1])
+        ]);
+        return { ...base, user_pairs: cleanedPairs };
+      }
       case "fill_blank":
-        return { ...base, user_answer: (selectedAnswer || typedAnswer).trim() };
+        return { ...base, user_answer: cleanAnswerString(selectedAnswer || typedAnswer) };
       case "type_answer":
-        return { ...base, user_answer: typedAnswer.trim() };
+        return { ...base, user_answer: cleanAnswerString(typedAnswer) };
       default:
         return null;
     }
   };
-
-  // Submit answer
   const handleSubmit = useCallback(async () => {
     if (!hasAnswer || isSubmitted || !currentExercise || !attemptId) return;
     setIsSubmitted(true);
@@ -207,7 +227,18 @@ export default function LessonPage() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to check answer");
     }
-  }, [hasAnswer, isSubmitted, currentExercise, attemptId, heartsRemaining, lessonId]);
+  }, [
+    hasAnswer,
+    isSubmitted,
+    currentExercise,
+    attemptId,
+    heartsRemaining,
+    lessonId,
+    wordBankSelected,
+    selectedAnswer,
+    matchedPairs,
+    typedAnswer,
+  ]);
 
   // Advance to next question or complete lesson
   const handleContinue = useCallback(async () => {
@@ -382,16 +413,29 @@ export default function LessonPage() {
           />
         )}
 
+
+
         {currentExercise.type === "match_pairs" && (
           <MatchPairsExercise
             data={currentExercise.data as { pairs: string[][] }}
             matchSelected={matchSelected}
             matchedPairs={matchedPairs}
             onSelect={(side, val) => {
+              // Unmatch if clicking an already matched item
+              const existingPair = matchedPairs.find(p => p.includes(val));
+              if (existingPair) {
+                setMatchedPairs(pairs => pairs.filter(p => p !== existingPair));
+                return;
+              }
+
               setMatchSelected(prev => {
                 const next = { ...prev, [side]: val };
                 if (next.left && next.right) {
-                  setMatchedPairs(pairs => [...pairs, [next.left!, next.right!]]);
+                  const newPair = [next.left, next.right];
+                  setMatchedPairs(pairs => {
+                    const filtered = pairs.filter(p => p[0] !== next.left && p[1] !== next.right);
+                    return [...filtered, newPair];
+                  });
                   return { left: null, right: null };
                 }
                 return next;
@@ -400,8 +444,6 @@ export default function LessonPage() {
             disabled={isSubmitted}
           />
         )}
-
-        {/* fill_blank options vs text input */}
         {currentExercise.type === "fill_blank" && (
           (currentExercise.data.options as string[] | undefined)?.length ? (
             <FillBlankChoiceExercise
@@ -720,6 +762,8 @@ function FillBlankChoiceExercise({
   );
 }
 
+
+
 function MatchPairsExercise({
   data, matchSelected, matchedPairs, onSelect, disabled,
 }: {
@@ -730,7 +774,12 @@ function MatchPairsExercise({
   disabled: boolean;
 }) {
   const lefts = data.pairs.map(p => p[0]);
-  const rights = data.pairs.map(p => p[1]);
+  
+  // Shuffled right options so they aren't pre-aligned in identical order
+  const rights = React.useMemo(() => {
+    const r = data.pairs.map(p => p[1]);
+    return [...r].sort((a, b) => (a.charCodeAt(0) % 3) - (b.charCodeAt(0) % 3));
+  }, [data.pairs]);
 
   const renderChip = (val: string, side: "left" | "right") => {
     const isMatched = matchedPairs.some(p => p.includes(val));
@@ -738,9 +787,9 @@ function MatchPairsExercise({
 
     let cls = "p-3.5 rounded-2xl border-2 font-extrabold text-sm text-center w-full transition-all ";
     if (isMatched) {
-      cls += "border-[#58CC02] bg-[#58CC02]/10 text-[#58CC02] opacity-50 cursor-default";
+      cls += "border-[#58CC02] bg-[#58CC02]/10 text-[#58CC02] opacity-60 cursor-pointer hover:border-[#FF4B4B] hover:text-[#FF4B4B]";
     } else if (isSelected) {
-      cls += "border-[#1CB0F6] bg-[#1CB0F6]/10 text-[#1CB0F6]";
+      cls += "border-[#1CB0F6] bg-[#1CB0F6]/10 text-[#1CB0F6] shadow-[0_4px_0_#1899D6]";
     } else if (disabled) {
       cls += "border-[#37464F] bg-[#1A2C32] text-[#5A6B73]";
     } else {
@@ -750,9 +799,10 @@ function MatchPairsExercise({
     return (
       <button
         key={val}
-        onClick={() => !disabled && !isMatched && onSelect(side, val)}
-        disabled={disabled || isMatched}
+        onClick={() => !disabled && onSelect(side, val)}
+        disabled={disabled}
         className={cls}
+        title={isMatched ? "Tap to un-match" : undefined}
       >
         {val}
       </button>
@@ -770,8 +820,10 @@ function MatchPairsExercise({
 function TypeAnswerExercise({
   value, onChange, disabled, placeholder,
 }: { value: string; onChange: (v: string) => void; disabled: boolean; placeholder: string }) {
+  const accentChars = ["á", "é", "í", "ó", "ú", "ñ", "¿", "¡"];
+
   return (
-    <div className="w-full">
+    <div className="w-full space-y-3">
       <input
         type="text"
         value={value}
@@ -781,6 +833,19 @@ function TypeAnswerExercise({
         className="w-full px-5 py-4 text-lg font-bold border-2 rounded-2xl bg-[#1A2C32] text-white border-[#37464F] focus:outline-none focus:border-[#1CB0F6] placeholder:text-[#5A6B73] transition-all disabled:opacity-60"
         autoFocus
       />
+      <div className="flex flex-wrap gap-2 justify-center pt-1">
+        {accentChars.map(char => (
+          <button
+            key={char}
+            type="button"
+            onClick={() => !disabled && onChange(value + char)}
+            disabled={disabled}
+            className="w-10 h-10 rounded-xl bg-[#1A2C32] border-2 border-[#37464F] text-white font-extrabold text-base hover:border-[#1CB0F6] hover:bg-[#233A42] active:scale-95 transition-all disabled:opacity-40"
+          >
+            {char}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

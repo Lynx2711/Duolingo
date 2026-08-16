@@ -1,50 +1,68 @@
-# Import Column types, including JSON for flexible exercise data, and ForeignKey
+# ==============================================================================
+# DATABASE ORM MODELS FOR LESSONS & EXERCISES (models/lesson.py)
+# ==============================================================================
+# HINDI CONCEPT (समझने के लिए):
+# - Lesson: Ek Topic ke andar chhota chapter/lesson (e.g. Greetings Lesson 1).
+# - Exercise: Iss lesson ke andar ka Har Single Question (e.g. Multiple Choice,
+#   Translate Word Bank, Fill in the Blank, Type Answer, Match Pairs).
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# INBUILT VS CUSTOM IMPORTS EXPLANATION:
+# ------------------------------------------------------------------------------
+# 1. Column, Integer, String, ForeignKey, JSON (SQLAlchemy Inbuilt Types):
+#    Notice `JSON`: SQLite database me pura Python Dictionary/List object as JSON 
+#    string save karne ke liye SQLAlchemy built-in column type.
+# 2. relationship (SQLAlchemy Inbuilt): ORM Relationship mapping.
+# 3. Base (Custom Core Import): Inherited SQLAlchemy Base class.
+# ------------------------------------------------------------------------------
 from sqlalchemy import Column, Integer, String, ForeignKey, JSON
-# Import relationship to link models together
 from sqlalchemy.orm import relationship
-# Import Base from core.database
 from core.database import Base
 
-# Define the Lesson model representing a single lesson within a skill
+# ==============================================================================
+# LESSON MODEL (`lessons` table in Database)
+# ==============================================================================
 class Lesson(Base):
-    # Set the table name
     __tablename__ = 'lessons'
 
-    # Primary key for the lesson
     id = Column(Integer, primary_key=True)
-    # Foreign key linking to the skill, with CASCADE delete
+    # Physical Foreign Key linking to `skills.id`
     skill_id = Column(Integer, ForeignKey('skills.id', ondelete='CASCADE'), nullable=False)
-    # Display order of the lesson, required
+    # Sequence order within the skill (1, 2...)
     order = Column(Integer, nullable=False)
-    # Type of lesson (e.g., 'lesson', 'practice', 'legendary'), default is 'lesson'
+    # Lesson Type ('lesson', 'practice', 'legendary')
     type = Column(String(20), default='lesson', nullable=False)
     
-    # Relationship back to the parent skill
+    # ORM Relationships:
     skill = relationship('Skill', back_populates='lessons')
-    # Relationship to Exercise model, deletes exercises if lesson is deleted
     exercises = relationship('Exercise', back_populates='lesson', cascade='all, delete-orphan', passive_deletes=True)
-    # Relationship to attempt records, deletes attempts if lesson is deleted
     attempts = relationship('UserLessonAttempt', back_populates='lesson', cascade='all, delete-orphan', passive_deletes=True)
 
-# Define the Exercise model representing a single question/challenge in a lesson
+# ==============================================================================
+# EXERCISE MODEL (`exercises` table in Database)
+# ==============================================================================
+# HINDI CONCEPT: Question Data Structure
+# Har question ka visual format aur options `data` (JSON column) me store hote hain:
+# - multiple_choice: data = {"options": ["Hola", "Adiós", "Gracias"]}
+# - translate_word_bank: data = {"word_bank": ["Good", "morning"], "sentence": "Buenos días"}
+# - match_pairs: data = {"pairs": [["Hola", "Hello"], ["Adiós", "Goodbye"]]} (correct_answer = None)
+# ==============================================================================
 class Exercise(Base):
-    # Set the table name
     __tablename__ = 'exercises'
 
-    # Primary key for the exercise
     id = Column(Integer, primary_key=True)
-    # Foreign key linking to the lesson, with CASCADE delete
     lesson_id = Column(Integer, ForeignKey('lessons.id', ondelete='CASCADE'), nullable=False)
-    # Display order of the exercise within the lesson, required
     order = Column(Integer, nullable=False)
-    # Type of exercise (e.g., 'multiple_choice', 'translate_word_bank'), required
+    # Exercise Type ('multiple_choice', 'translate_word_bank', 'type_answer', 'fill_blank', 'match_pairs')
     type = Column(String(30), nullable=False)
-    # The prompt/question shown to the user, required
+    # Question text shown to user (e.g. 'How do you say "Hello" in Spanish?')
     prompt = Column(String(500), nullable=False)
-    # JSON field holding specific configuration for the exercise type, required
+    # Flexible JSON Data (SQLAlchemy Inbuilt JSON Type) for word banks & options
     data = Column(JSON, nullable=False)
-    # The correct answer (nullable for types like match_pairs where it's in data)
+    # Target Answer string (Nullable for `match_pairs` where answer is in `data["pairs"]`)
     correct_answer = Column(String(500), nullable=True)
     
-    # Relationship back to the parent lesson
+    # Relationship:
     lesson = relationship('Lesson', back_populates='exercises')
+

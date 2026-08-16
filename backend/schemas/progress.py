@@ -1,73 +1,64 @@
-# Import BaseModel and ConfigDict for schemas
+# ==============================================================================
+# PYDANTIC SCHEMAS FOR PROGRESS, LEADERBOARD & PROFILE (schemas/progress.py)
+# ==============================================================================
+# HINDI CONCEPT (समझने के लिए):
+# - UserSkillProgressResponse: Skill level summary.
+# - LeaderboardEntry: Leaderboard screen par har user ki rank, avatar aur XP.
+# - ProfileResponse: Profile tab screen ke liye aggregated user stats summary payload.
+# ==============================================================================
+
 from pydantic import BaseModel, ConfigDict
-# Import datetime, Optional, List for type hints
 from typing import Optional, List
 from datetime import datetime
-# Import UserResponse to embed in ProfileResponse
-from schemas.user import UserResponse
+from schemas.user import UserResponse  # Importing UserResponse for nesting inside Profile
 
-# Define response schema for UserSkillProgress
+# ==============================================================================
+# USER SKILL PROGRESS RESPONSE SCHEMA
+# ==============================================================================
 class UserSkillProgressResponse(BaseModel):
-    # Record ID
     id: int
-    # User ID
     user_id: int
-    # Skill ID
     skill_id: int
-    # Current crown level
     level: int
-    # Completed lessons in current level
     completed_lessons: int
-    # Total lessons in current level
     total_lessons: int
-    # Timestamp of completion, optional
     completed_at: Optional[datetime] = None
 
-    # Enable reading from ORM attributes
     model_config = ConfigDict(from_attributes=True)
 
-# Define response schema for UserLessonAttempt
+# ==============================================================================
+# LESSON ATTEMPT RESPONSE SCHEMA
+# ==============================================================================
 class UserLessonAttemptResponse(BaseModel):
-    # Record ID
     id: int
-    # User ID
     user_id: int
-    # Lesson ID
     lesson_id: int
-    # XP earned in attempt
     xp_earned: int
-    # Hearts lost in attempt
     hearts_lost: int
-    # Timestamp when started
     started_at: datetime
-    # Timestamp when finished, optional
     completed_at: Optional[datetime] = None
-    # Boolean indicating if passed
     passed: bool
 
-    # Enable reading from ORM attributes
     model_config = ConfigDict(from_attributes=True)
 
-# Define schema for a single entry on the leaderboard
+# ==============================================================================
+# LEADERBOARD ENTRY SCHEMA (For `/api/leaderboard`)
+# ==============================================================================
 class LeaderboardEntry(BaseModel):
-    # User ID
     id: int
-    # User name
     name: str
-    # User avatar URL, optional
     avatar_url: Optional[str] = None
-    # User total XP (score)
     xp_total: int
 
-# Define schema for a user's full profile page data
+# ==============================================================================
+# PROFILE RESPONSE SCHEMA (For `/api/profile/{user_id}`)
+# ==============================================================================
+# HINDI CONCEPT: Nested Schemas
+# Notice `user: UserResponse` -> Ek Pydantic Schema ke andar dusra Pydantic Schema embed kiya gaya hai.
 class ProfileResponse(BaseModel):
-    # Nested user information
-    user: UserResponse
-    # Total number of skills fully completed
-    total_skills_completed: int
-    # Total number of lessons successfully passed
-    total_lessons_completed: int
-    # Name of the currently active course, optional
-    current_course: Optional[str] = None
-    # List of achievement strings earned by user
-    achievements: List[str]
+    user: UserResponse                  # Nested User Details (name, xp, streak, hearts...)
+    total_skills_completed: int         # Count of skills with level >= 1
+    total_lessons_completed: int        # Count of successfully passed attempts
+    current_course: Optional[str] = None# Active course name e.g. "Spanish"
+    achievements: List[str]             # List of earned badge names
+

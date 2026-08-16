@@ -1,123 +1,129 @@
-# Import APIRouter, Depends, and HTTPException from fastapi to build our endpoints
+# ==============================================================================
+# COURSES & LEARNING PATH API ENDPOINTS (api/routes/courses.py)
+# ==============================================================================
+# HINDI CONCEPT (समझने के लिए):
+# Yahan Course navigation, Units, Skills aur Duolingo-style "Learning Path" (Skill Tree)
+# calculate hota hai.
+# Main Endpoint: `/api/courses/{course_id}/path/{user_id}`
+# Ye check karta hai ki user ka kaunsa Skill Node Unlocked (Green) hai aur kaunsa Locked (Grey).
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# INBUILT VS CUSTOM IMPORTS EXPLANATION:
+# ------------------------------------------------------------------------------
+# 1. APIRouter (FastAPI Inbuilt Router): Route grouping ke liye built-in tool.
+# 2. Depends (FastAPI Inbuilt Dependency Injection): `get_db` se automatic DB session lene ke liye.
+# 3. HTTPException (FastAPI Inbuilt Exception): Standard HTTP 404 / 403 error responses bhejne ke liye.
+# 4. Session, selectinload (SQLAlchemy Inbuilt Tools):
+#    - `Session`: DB Session Type Annotation.
+#    - `selectinload`: Eager Loading helper jo 1 Query me Course + Units + Skills sabhi 
+#      nested DB relations fetch karta hai (Performance Optimization - Solves N+1 Problem).
+# ------------------------------------------------------------------------------
 from fastapi import APIRouter, Depends, HTTPException
-# Import Session for typing the database connection
 from sqlalchemy.orm import Session
-# Import selectinload for eager loading relationships efficiently
 from sqlalchemy.orm import selectinload
-# Import get_db to inject the database session
-from core.database import get_db
-# Import Models needed for querying courses and progress
-from models.course import Course, Unit, Skill
-from models.progress import UserSkillProgress
-# Import Schemas to serialize responses correctly
-from schemas.course import CourseResponse, CourseWithUnits, UnitWithSkills, SkillWithProgress
-# Import List and Dict for type hinting
 from typing import List, Dict, Any
 
-# Create the router for course-related endpoints
+# Custom Project Imports:
+from core.database import get_db
+from models.course import Course, Unit, Skill
+from models.progress import UserSkillProgress
+from schemas.course import CourseResponse, CourseWithUnits
+
+# Create API Router with prefix `/api/courses`
 router = APIRouter(prefix="/api/courses", tags=["Courses"])
 
-# Define GET endpoint to list all available courses
+# ==============================================================================
+# GET /api/courses - List all available courses
+# ==============================================================================
 @router.get("", response_model=List[CourseResponse])
 @router.get("/", response_model=List[CourseResponse])
 def get_courses(db: Session = Depends(get_db)) -> List[CourseResponse]:
-    # Query all courses from the database
+    """
+    Data Source: `courses` table in SQLite DB.
+    Returns: List of available courses (e.g. Spanish).
+    """
     courses = db.query(Course).all()
-    # Return the list of courses, Pydantic will format them as CourseResponse
     return courses
 
-# Define GET endpoint to retrieve a specific course by its ID
+# ==============================================================================
+# GET /api/courses/{course_id} - Fetch single course details
+# ==============================================================================
 @router.get("/{course_id}", response_model=CourseResponse)
 def get_course(course_id: int, db: Session = Depends(get_db)) -> CourseResponse:
-    # Query the course filtering by the provided ID
     course = db.query(Course).filter(Course.id == course_id).first()
-    # If no course is found with this ID
     if not course:
-        # Raise a 404 Not Found exception
+        # Inbuilt FastAPI Exception: Returns JSON `{"detail": "Course not found"}` with status 404
         raise HTTPException(status_code=404, detail="Course not found")
-    # Return the found course
     return course
 
-# Define GET endpoint to construct the full learning path (skill tree) for a user in a specific course
+# ==============================================================================
+# GET /api/courses/{course_id}/path/{user_id} - Duolingo Learning Path Generator
+# ==============================================================================
+# HINDI CONCEPT: Skill Tree Lock/Unlock Logic
+# Rule: Pehla skill (Greetings) humesha UNLOCKED (is_locked = False) rehta hai.
+# Agla skill tabhi unlock hota hai jab picchla skill kam se kam Level 1 complete kar le!
+# ==============================================================================
 @router.get("/{course_id}/path/{user_id}", response_model=CourseWithUnits)
 def get_course_path(course_id: int, user_id: int, db: Session = Depends(get_db)) -> Any:
-    # Query the course and eagerly load its units and skills to prevent N+1 query problems
+    # 1. Fetch Course with Eager Loading (SQLAlchemy Built-in `selectinload`):
+    # Ek hi SQL Query me Course -> Units -> Skills sab fetch ho jate hain.
     course = db.query(Course).options(
-        # Eager load units for the course
         selectinload(Course.units).selectinload(Unit.skills)
     ).filter(Course.id == course_id).first()
-    
-    # If the course doesn't exist, handle the error
+ 
     if not course:
-        # Raise 404 to notify client of invalid course ID
         raise HTTPException(status_code=404, detail="Course not found")
 
-    # Fetch all skill progress records for this user to calculate unlocks
+    # 2. Fetch User's Skill Progress Records:
+    # Data Source: `user_skill_progress` table for this user.
     user_progress_records = db.query(UserSkillProgress).filter(
-        # Filter by the requested user ID
         UserSkillProgress.user_id == user_id
     ).all()
     
-    # Create a dictionary mapping skill_id to its progress record for O(1) lookups
+    # Quick O(1) Dictionary Lookup by skill_id
     progress_dict: Dict[int, UserSkillProgress] = {
-        # Key is skill_id, value is the progress object
         p.skill_id: p for p in user_progress_records
     }
 
-    # Initialize a list to hold the structured units to return
     result_units = []
-    # Initialize a flag to track if the previous skill in the tree was completed (level >= 1)
-    # The very first skill is always unlocked, so we pretend the 'previous' was completed
+    # Flag: Pehle skill ke liye True rakha hai taaki pehla skill unlocked rhe
     previous_skill_completed = True
 
-    # Iterate over units in the course, sorted by their order attribute
+    # 3. Process Units & Skills in order:
     sorted_units = sorted(course.units, key=lambda u: u.order)
     for unit in sorted_units:
-        # Initialize a list to hold the skills for this unit
         result_skills = []
-        # Sort the skills within the unit by their order attribute
         sorted_skills = sorted(unit.skills, key=lambda s: s.order)
         
-        # Iterate over each skill to compute its state
         for skill in sorted_skills:
-            # Look up if the user has any progress for this specific skill
             prog = progress_dict.get(skill.id)
             
-            # Default values if no progress exists
             level = 0
             completed_lessons = 0
             total_lessons = 0
             
-            # If progress exists, extract the values
             if prog:
-                # User's current level in this skill
                 level = prog.level
-                # Number of lessons completed in the current level
                 completed_lessons = prog.completed_lessons
-                # Total lessons required to pass this level
                 total_lessons = prog.total_lessons
             else:
-                # If no progress, we need to find total_lessons from DB (simplification: we count lessons)
-                # In a real app we might cache this, but for now we just count them
                 from models.lesson import Lesson
                 total_lessons = db.query(Lesson).filter(Lesson.skill_id == skill.id).count()
                 
-            # Determine if this skill is locked. It is unlocked if the previous skill was completed.
+            # Lock status calculation: Lock tabhi khulega agar pichhla skill completed tha
             is_locked = not previous_skill_completed
 
-            # Query lessons for this skill to find the next lesson ID to launch
+            # 4. Find Next Uncompleted Lesson ID for starting lessons:
             from models.lesson import Lesson
             skill_lessons = db.query(Lesson).filter(Lesson.skill_id == skill.id).order_by(Lesson.order).all()
             next_lesson_id = None
             if skill_lessons:
-                # If there are uncompleted lessons, pick the lesson corresponding to completed_lessons count
                 if completed_lessons < len(skill_lessons):
                     next_lesson_id = skill_lessons[completed_lessons].id
                 else:
-                    # If all lessons completed, pick the first lesson for practice/replay
                     next_lesson_id = skill_lessons[0].id
 
-            # Append the structured skill data to our unit's skill list
             result_skills.append({
                 "id": skill.id,
                 "unit_id": skill.unit_id,
@@ -130,36 +136,33 @@ def get_course_path(course_id: int, user_id: int, db: Session = Depends(get_db))
                 "total_lessons": total_lessons,
                 "is_locked": is_locked,
                 "next_lesson_id": next_lesson_id,
-                # Full ordered list of lesson IDs for this skill — the frontend
-                # renders each lesson as a separate path node instead of one node per skill.
                 "lesson_ids": [l.id for l in skill_lessons],
             })
             
-            # Update previous_skill_completed for the NEXT skill in the iteration
-            # A skill is considered completed if its level is >= 1
+            # Agle skill ke liye check: Agar iss skill ka level >= 1 ho gaya, toh agla unlock hoga!
             previous_skill_completed = (level >= 1)
             
-        # Append the unit containing its evaluated skills to our result units
         result_units.append({
-            "id": unit.id, # Unit ID
-            "course_id": unit.course_id, # Parent Course ID (required by UnitResponse schema)
-            "order": unit.order, # Unit order
-            "title": unit.title, # Unit title
-            "description": unit.description, # Unit description
-            "color": unit.color, # Unit color
-            "skills": result_skills # Evaluated skills for this unit
+            "id": unit.id,
+            "course_id": unit.course_id,
+            "order": unit.order,
+            "title": unit.title,
+            "description": unit.description,
+            "color": unit.color,
+            "skills": result_skills
         })
         
-    # Return the fully structured learning path as a dictionary matching CourseWithUnits schema
     return {
-        "id": course.id, # Course ID
-        "name": course.name, # Course name
-        "language_code": course.language_code, # Language
-        "icon_url": course.icon_url, # Course Icon
-        "units": result_units # Structured units with calculated progress
+        "id": course.id,
+        "name": course.name,
+        "language_code": course.language_code,
+        "icon_url": course.icon_url,
+        "units": result_units
     }
 
-# Define GET endpoint for unit guidebook (key phrases & grammar tips)
+# ==============================================================================
+# GET /api/courses/units/{unit_id}/guidebook - Fetch Unit Grammar Tips
+# ==============================================================================
 @router.get("/units/{unit_id}/guidebook")
 def get_unit_guidebook(unit_id: int, db: Session = Depends(get_db)) -> Any:
     unit = db.query(Unit).filter(Unit.id == unit_id).first()
@@ -230,7 +233,6 @@ def get_unit_guidebook(unit_id: int, db: Session = Depends(get_db)) -> Any:
         }
     }
 
-    # Return default guidebook if custom doesn't exist
     return guidebooks.get(unit_id, {
         "unit_id": unit.id,
         "unit_number": unit.order,
@@ -247,4 +249,5 @@ def get_unit_guidebook(unit_id: int, db: Session = Depends(get_db)) -> Any:
             }
         ]
     })
+
 
