@@ -1,7 +1,5 @@
 # ==============================================================================
 # LESSON PLAYBACK & ANSWER VERIFICATION ENDPOINTS (api/routes/lessons.py)
-# ==============================================================================
-# HINDI CONCEPT (समझने के लिए):
 # Ye backend ka "Brain & Engine" hai jahan Duolingo questions check hote hain!
 # 3-Step Secure Lifecycle:
 # Step 1: GET /api/lessons/{id} -> Frontend ko exercises milti hain (correct_answer REMOVED)
@@ -80,7 +78,7 @@ def get_lesson(lesson_id: int, db: Session = Depends(get_db)) -> Any:
 # ==============================================================================
 # POST /api/lessons/{lesson_id}/start/{user_id} - Start Lesson Session
 # ==============================================================================
-# HINDI CONCEPT: Session Creation
+# Session Creation
 # Naya attempt row generate karke `attempt_id` integer return karta hai.
 # Server is attempt row me client dwara score kiye gaye XP aur haraye gaye hearts ko track karega.
 # ==============================================================================
@@ -115,7 +113,7 @@ def start_lesson(lesson_id: int, user_id: int, db: Session = Depends(get_db)) ->
 # Normalization logic:
 # 1. Accent characters (NFD decomposition) ko normal ASCII characters me change karta hai.
 # 2. Extra spaces aur punctuation (!, ?, .) remove karta hai.
-# 3. Case-insensitive lowercasing करता hai.
+# 3. Case-insensitive lowercasing hai.
 # Isse "Adiós" aur "adios" bilkul SAME treat hote hain!
 # ==============================================================================
 @router.post("/{lesson_id}/check-answer", response_model=AnswerResult)
@@ -176,7 +174,7 @@ def check_answer(lesson_id: int, check: AnswerCheck, db: Session = Depends(get_d
                     for pair in correct_pairs
                     if isinstance(pair, (list, tuple)) and len(pair) == 2
                 ])
-                is_correct = (len(norm_user) == len(norm_correct)) and (norm_user == norm_correct)
+                is_correct = (len(norm_user) == len(norm_correct)) and (norm_user == norm_correct) 
             except Exception:
                 is_correct = False
     else:
@@ -203,7 +201,7 @@ def check_answer(lesson_id: int, check: AnswerCheck, db: Session = Depends(get_d
 # ==============================================================================
 # POST /api/lessons/{lesson_id}/complete/{user_id} - Complete & Finalize Lesson
 # ==============================================================================
-# HINDI CONCEPT: Complete Lesson Transaction
+# Complete Lesson Transaction
 # 1. DB se Attempt row check karta hai (Zero trusting of client scores).
 # 2. If hearts_lost >= 5, then passed = False (Lesson Over).
 # 3. If passed = True, user.xp_total me XP add karta hai, streak calculate karta hai.

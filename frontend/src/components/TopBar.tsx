@@ -26,6 +26,7 @@ export const TopBar: React.FC<TopBarProps> = ({ user, onUserUpdate }) => {
   const streak = user ? user.streak : 0;
   const gems = user ? user.gems : 0;
   const hearts = user ? user.hearts : 0;
+  const xp = user ? user.xp_total : 0;
 
   return (
     <>
@@ -55,6 +56,16 @@ export const TopBar: React.FC<TopBarProps> = ({ user, onUserUpdate }) => {
               alt="Spanish Flag"
               className="w-7 h-5 object-contain"
             />
+          </div>
+
+          {/* Total XP Counter */}
+          <div className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity" title="Total XP">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#FFC800" className="shrink-0 drop-shadow-[0_1px_2px_rgba(255,200,0,0.4)]">
+              <path d="M7 2v11h3v9l7-12h-4l4-8z" />
+            </svg>
+            <span className="text-sm font-black text-[#FFC800]">
+              {xp}
+            </span>
           </div>
 
           {/* Streak Flame */}

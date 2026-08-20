@@ -1,5 +1,3 @@
-// src/lib/api.ts — Centralized API Client (Updated for server-side security model)
-//
 // All lesson-related calls now follow the secure attempt_id pattern:
 // /start -> attempt_id -> /check-answer (with attempt_id) -> /complete (with attempt_id only)
 

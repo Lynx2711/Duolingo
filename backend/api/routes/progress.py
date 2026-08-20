@@ -1,12 +1,9 @@
-# ==============================================================================
 # SKILL PROGRESS & ATTEMPTS HISTORY ENDPOINTS (api/routes/progress.py)
-# ==============================================================================
-# HINDI CONCEPT (समझने के लिए):
 # User Progress & History endpoints:
 # 1. GET /api/progress/users/{user_id} -> User ke sabhi skills ka progress list
 # 2. GET /api/progress/users/{user_id}/skills/{skill_id} -> Single skill progress record
 # 3. GET /api/progress/users/{user_id}/attempts -> Attempt History (most recent first)
-# ==============================================================================
+
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session

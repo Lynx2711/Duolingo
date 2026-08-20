@@ -1,7 +1,5 @@
 # ==============================================================================
 # PYDANTIC SCHEMAS FOR COURSES, UNITS & LEARNING PATH (schemas/course.py)
-# ==============================================================================
-# HINDI CONCEPT (समझने के लिए):
 # Pydantic Schemas humare API ka "Data Security Guard & Packing Box" hain.
 # 1. Incoming Request Data ko validate karte hain (Type check: int, str, bool).
 # 2. Outgoing JSON Data ko shape aur structure dete hain jo frontend expect karta hai.
